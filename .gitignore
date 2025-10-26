@@ -1,0 +1,8 @@
+.venv/
+build/
+maxim.egg-info/
+maxim/ckpts/
+maxim/models/
+maxim/images/
+maxim/__pycache__/
+__pycache__/
