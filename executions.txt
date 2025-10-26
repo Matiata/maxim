@@ -1,0 +1,9 @@
+# Deblurring
+## EVAL
+python3 maxim/run_eval.py --task Deblurring --ckpt_path maxim/ckpts/maxim_ckpt_Deblurring_GoPro_checkpoint.npz --input_dir maxim/images/Deblurring --output_dir maxim/images/Results --has_target=False
+## TRAINING
+python3 maxim/tester.py --train_dir /media/matiata/bddb6e17-bcd1-4bf6-98c8-73b1d79fb9d3/Datasets/Deblurring/HIDE_dataset --val_dir /media/matiata/bddb6e17-bcd1-4bf6-98c8-73b1d79fb9d3/Datasets/Deblurring/HIDE_dataset
+python3 maxim/tester.py --dataset_dir /media/matiata/bddb6e17-bcd1-4bf6-98c8-73b1d79fb9d31/Datasets/Deblurring/HIDE_dataset
+
+## nsys report
+nsys profile -o nsys_report --force-overwrite true --trace=cuda,nvtx,osrt python3 maxim/run_eval.py --task Deblurring --ckpt_path maxim/ckpts/maxim_ckpt_Deblurring_GoPro_checkpoint.npz --input_dir maxim/images/Deblurring --output_dir maxim/images/Results --has_target=False
