@@ -40,8 +40,7 @@ flags.DEFINE_enum(
     ["Denoising", "Deblurring", "Deraining", "Dehazing", "Enhancement"],
     "Task to train.",
 )
-flags.DEFINE_string("train_dir", "", "Training data directory.")
-flags.DEFINE_string("val_dir", "", "Validation data directory.")
+flags.DEFINE_string("dataset_dir", "", "Path to the dataset.")
 flags.DEFINE_string("output_dir", "./checkpoints", "Output directory for checkpoints.")
 flags.DEFINE_integer("batch_size", 8, "Batch size for training.")
 flags.DEFINE_integer("num_epochs", 300, "Number of training epochs.")
@@ -158,20 +157,46 @@ def random_rotation(image, target):
     target = np.rot90(target, k=k)
     return image, target
 
+def read_lines_from_file(basepath, filepath):
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = [line.strip() for line in f if line.strip()]
+
+    existing = []
+    missing = []
+
+    for line in lines:
+        p = os.path.join(basepath, line)
+        if os.path.exists(p):
+            existing.append(p)
+        else:
+            missing.append(p)
+
+    print(f"Checked {len(lines)} files in {basepath}: {len(existing)} existing, {len(missing)} missing.")
+
+    return existing, missing
+
 
 def create_dataset(data_dir, batch_size, patch_size, is_training=True):
     """Create TensorFlow dataset for training/validation."""
 
-    input_dir = os.path.join(data_dir, "input")
-    target_dir = os.path.join(data_dir, "target")
+    input_dir = os.path.join(data_dir, "train") if is_training else os.path.join(data_dir, "test")
+    target_dir = os.path.join(data_dir, "GT")
+    files_list = os.path.join(data_dir, "train.txt") if is_training else os.path.join(data_dir, "test.txt")
 
-    input_files = sorted(tf.io.gfile.glob(os.path.join(input_dir, "*")))
-    target_files = sorted(tf.io.gfile.glob(os.path.join(target_dir, "*")))
+    # # Alternatively, you can load all files in the directory
+    # input_files = sorted(tf.io.gfile.glob(os.path.join(input_dir, "*")))
+    # target_files = sorted(tf.io.gfile.glob(os.path.join(target_dir, "*")))
+
+    input_files, _ = read_lines_from_file(input_dir, files_list)
+    target_files, _ = read_lines_from_file(target_dir, files_list)
 
     def load_and_preprocess(input_path, target_path):
         """Load and preprocess a single pair of images."""
         input_img = load_image(input_path.numpy().decode())
         target_img = load_image(target_path.numpy().decode())
+        print(
+            f"Loaded images: {input_path.numpy().decode()}, {target_path.numpy().decode()} with shapes {input_img.shape}, {target_img.shape}"
+        )
 
         if is_training:
             # Data augmentation
@@ -199,6 +224,7 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
     return dataset
 
 
+
 def compute_loss(preds, targets, num_scales=3):
     """Compute multi-scale L1 loss."""
     total_loss = 0.0
@@ -222,9 +248,27 @@ def compute_loss(preds, targets, num_scales=3):
 
 
 def compute_psnr(pred, target):
-    """Compute PSNR metric."""
-    mse = jnp.mean((pred - target) ** 2)
-    psnr = 20.0 * jnp.log10(1.0 / jnp.sqrt(mse + 1e-10))
+    """Compute PSNR metric.
+
+    Args:
+      pred: Predicted image in [0, 1] range
+      target: Target image in [0, 1] range
+
+    Returns:
+      PSNR in dB, computed as if images were in [0, 255] range
+      to match the evaluation script.
+    """
+    # Convert to [0, 255] range for PSNR calculation
+    pred_255 = pred * 255.0
+    target_255 = target * 255.0
+
+    mse = jnp.mean((pred_255 - target_255) ** 2)
+
+    # Avoid division by zero
+    if mse == 0:
+        return jnp.float32(100.0)  # Perfect match
+
+    psnr = 20.0 * jnp.log10(255.0 / jnp.sqrt(mse))
     return psnr
 
 
@@ -269,7 +313,7 @@ def train_step(state, batch_input, batch_target, num_scales):
     return state, metrics
 
 
-@functools.partial(jax.jit, static_argnums=(2,))
+@jax.jit
 def eval_step(state, batch_input, batch_target):
     """Single evaluation step."""
     if state.batch_stats is not None:
@@ -352,10 +396,10 @@ def main(_):
 
     # Create datasets
     train_dataset = create_dataset(
-        FLAGS.train_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=True
+        FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=True
     )
-    val_dataset = create_dataset(
-        FLAGS.val_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=False
+    test_dataset = create_dataset(
+        FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=False
     )
 
     # Calculate steps
@@ -395,7 +439,7 @@ def main(_):
         )
 
         # Validation
-        val_metrics = evaluate(state, val_dataset)
+        val_metrics = evaluate(state, test_dataset)
         logging.info(
             f"Epoch {epoch} validation: "
             f'loss = {val_metrics["loss"]:.4f}, '
