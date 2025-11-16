@@ -170,6 +170,17 @@ python3 maxim/run_eval.py --task Enhancement --ckpt_path ${FIVEK_CKPT_PATH} \
 ```
 </details>
 
+## Training
+  Here `DATASET_PATH` should have 3 directories: `train`, `test` and `GT` each containing the corresponding images.
+  It's also assumed that `DATASET_PATH` includes files `train.txt` and `test.txt` listing the files for each task. 
+<details>
+  <summary><strong>Image Deblurring</strong> (click to expand) </summary>
+
+  ```
+  python3 maxim/tester.py --dataset_dir {DATASET_PATH}
+  ```
+</details>
+
 ## Results
 
 <details>

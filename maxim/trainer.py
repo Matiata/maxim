@@ -115,6 +115,25 @@ def create_train_state(rng, model, learning_rate_fn, weight_decay):
         apply_fn=model.apply, params=params, tx=tx, batch_stats=batch_stats
     )
 
+def make_shape_even(image):
+  """Pad the image to have even shapes."""
+  height, width = image.shape[0], image.shape[1]
+  padh = 1 if height % 2 != 0 else 0
+  padw = 1 if width % 2 != 0 else 0
+  image = jnp.pad(image, [(0, padh), (0, padw), (0, 0)], mode='reflect')
+  return image
+
+def mod_padding_symmetric(image, factor=64):
+  """Padding the image to be divided by factor."""
+  height, width = image.shape[0], image.shape[1]
+  height_pad, width_pad = ((height + factor) // factor) * factor, (
+      (width + factor) // factor) * factor
+  padh = height_pad - height if height % factor != 0 else 0
+  padw = width_pad - width if width % factor != 0 else 0
+  image = jnp.pad(
+      image, [(padh // 2, padh // 2), (padw // 2, padw // 2), (0, 0)],
+      mode='reflect')
+  return image
 
 def load_image(filepath):
     """Load and preprocess image."""
@@ -175,10 +194,48 @@ def read_lines_from_file(basepath, filepath):
 
     return existing, missing
 
+def pre_process(input_file):
+  '''
+  Pre-process the image before sending to the model
+  '''
+  input_img = load_image(input_file)
+  # Padding images to have even shapes
+  height, width = input_img.shape[0], input_img.shape[1]
+  input_img = make_shape_even(input_img)
+  height_even, width_even = input_img.shape[0], input_img.shape[1]
+
+  # padding images to be multiplies of 64
+  input_img = mod_padding_symmetric(input_img, factor=64)
+  input_img = np.expand_dims(input_img, axis=0)
+
+  return input_img, height, width, height_even, width_even
+
+def post_process(preds, height, width, height_even, width_even):
+  '''
+  Post process the image coming out from prediction
+  '''
+  if isinstance(preds, list):
+    preds = preds[-1]
+    if isinstance(preds, list):
+      preds = preds[-1]
+
+  # De-ensemble by averaging inferenced results.
+  preds = np.array(preds[0], np.float32)
+
+  # unpad images to get the original resolution
+  new_height, new_width = preds.shape[0], preds.shape[1]
+  h_start = new_height // 2 - height_even // 2
+  h_end = h_start + height
+  w_start = new_width // 2 - width_even // 2
+  w_end = w_start + width
+  preds = preds[h_start:h_end, w_start:w_end, :]
+  return np.array((np.clip(preds, 0., 1.) * 255.).astype(jnp.uint8))
+
 
 def create_dataset(data_dir, batch_size, patch_size, is_training=True):
     """Create TensorFlow dataset for training/validation."""
-
+    
+    print(f"Creating {'training' if is_training else 'validation'} dataset from {data_dir}")
     input_dir = os.path.join(data_dir, "train") if is_training else os.path.join(data_dir, "test")
     target_dir = os.path.join(data_dir, "GT")
     files_list = os.path.join(data_dir, "train.txt") if is_training else os.path.join(data_dir, "test.txt")
@@ -194,9 +251,18 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
         """Load and preprocess a single pair of images."""
         input_img = load_image(input_path.numpy().decode())
         target_img = load_image(target_path.numpy().decode())
-        print(
-            f"Loaded images: {input_path.numpy().decode()}, {target_path.numpy().decode()} with shapes {input_img.shape}, {target_img.shape}"
-        )
+
+        orig_h, orig_w = input_img.shape[:2]
+
+        # Padding images to have even shapes
+        input_img = make_shape_even(input_img)
+        target_img = make_shape_even(target_img)
+        even_h, even_w = input_img.shape[:2]
+        
+        # Padding images to be multiples of 64
+        input_img = mod_padding_symmetric(input_img, factor=64)
+        target_img = mod_padding_symmetric(target_img, factor=64)
+        pad_h, pad_w = input_img.shape[:2]
 
         if is_training:
             # Data augmentation
@@ -204,7 +270,11 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
             input_img, target_img = random_flip(input_img, target_img)
             input_img, target_img = random_rotation(input_img, target_img)
 
-        return input_img.astype(np.float32), target_img.astype(np.float32)
+        return (
+            input_img.astype(np.float32),
+            target_img.astype(np.float32),
+            np.array([orig_h, orig_w, even_h, even_w, pad_h, pad_w], np.int32),
+        )
 
     dataset = tf.data.Dataset.from_tensor_slices((input_files, target_files))
 
@@ -213,7 +283,9 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
 
     dataset = dataset.map(
         lambda x, y: tf.py_function(
-            load_and_preprocess, [x, y], [tf.float32, tf.float32]
+            func=load_and_preprocess,
+            inp=[x, y],
+            Tout=[tf.float32, tf.float32, tf.int32],
         ),
         num_parallel_calls=tf.data.AUTOTUNE,
     )
@@ -223,6 +295,15 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
 
     return dataset
 
+def resize_target_to(pred, target):
+    """Downsample target if necessary to match prediction shape."""
+    if pred.shape == target.shape:
+        return target
+    # Compute integer stride factors
+    scale_h = target.shape[1] // pred.shape[1]
+    scale_w = target.shape[2] // pred.shape[2]
+    # Subsample target by simple stride (fast, deterministic)
+    return target[:, ::scale_h, ::scale_w, :]
 
 
 def compute_loss(preds, targets, num_scales=3):
@@ -236,13 +317,15 @@ def compute_loss(preds, targets, num_scales=3):
                 # Multi-scale outputs within a stage
                 for scale_idx, pred in enumerate(stage_preds):
                     weight = 0.5 ** (num_scales - scale_idx - 1)
-                    loss = jnp.mean(jnp.abs(pred - targets))
+                    tgt_resized = resize_target_to(pred, targets)
+                    loss = jnp.mean(jnp.abs(pred - tgt_resized))
                     total_loss += weight * loss
             else:
-                loss = jnp.mean(jnp.abs(stage_preds - targets))
-                total_loss += loss
+                tgt_resized = resize_target_to(stage_preds, targets)
+                total_loss += jnp.mean(jnp.abs(stage_preds - tgt_resized))
     else:
-        total_loss = jnp.mean(jnp.abs(preds - targets))
+        tgt_resized = resize_target_to(preds, targets)
+        total_loss = jnp.mean(jnp.abs(preds - tgt_resized))
 
     return total_loss
 
@@ -263,32 +346,31 @@ def compute_psnr(pred, target):
     target_255 = target * 255.0
 
     mse = jnp.mean((pred_255 - target_255) ** 2)
-
-    # Avoid division by zero
-    if mse == 0:
-        return jnp.float32(100.0)  # Perfect match
-
+    mse = jnp.maximum(mse, 1e-6) # Avoid division by zero
+    
     psnr = 20.0 * jnp.log10(255.0 / jnp.sqrt(mse))
     return psnr
 
 
 @functools.partial(jax.jit, static_argnums=(3,))
-def train_step(state, batch_input, batch_target, num_scales):
+def train_step(state, batch_input, batch_target, num_scales, rng):
     """Single training step."""
 
     def loss_fn(params):
+        rngs = {"dropout": rng}
         if state.batch_stats is not None:
             preds, updates = state.apply_fn(
                 {"params": params, "batch_stats": state.batch_stats},
                 batch_input,
                 train=True,
+                rngs=rngs,
                 mutable=["batch_stats"],
             )
             new_batch_stats = updates["batch_stats"]
         else:
-            preds = state.apply_fn({"params": params}, batch_input, train=True)
+            preds = state.apply_fn({"params": params}, batch_input, train=True, rngs=rngs)
             new_batch_stats = None
-
+            
         loss = compute_loss(preds, batch_target, num_scales)
 
         # Get final prediction for metrics
@@ -337,12 +419,19 @@ def eval_step(state, batch_input, batch_target):
 def train_epoch(state, train_dataset, num_scales, epoch):
     """Train for one epoch."""
     batch_metrics = []
-
-    for step, (batch_input, batch_target) in enumerate(train_dataset):
+    print("Starting training epoch", epoch)
+    for step, (batch_input, batch_target, sizes) in enumerate(train_dataset):
+        print(f"Training epoch {epoch}, step {step}...")
         batch_input = jnp.array(batch_input)
         batch_target = jnp.array(batch_target)
+        orig_h, orig_w, even_h, even_w, pad_h, pad_w = jnp.array(sizes)
 
-        state, metrics = train_step(state, batch_input, batch_target, num_scales)
+        if( batch_input.shape != batch_target.shape):
+            print(f"Skipping step {step} due to shape mismatch: input {batch_input.shape}, target {batch_target.shape}")
+            continue
+        
+        rng, step_rng = jax.random.split(jax.random.PRNGKey(epoch * 1000 + step))
+        state, metrics = train_step(state, batch_input, batch_target, num_scales, step_rng)
         batch_metrics.append(metrics)
 
         if (step + 1) % FLAGS.log_every == 0:

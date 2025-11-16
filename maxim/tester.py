@@ -64,6 +64,11 @@ _MODEL_CONFIGS = {
     "num_supervision_scales": 3,
 }
 
+class TrainState(train_state.TrainState):
+    """Extended train state with batch statistics."""
+
+    batch_stats: Any = None
+    
 
 def load_image(filepath):
     """Load and preprocess image."""
@@ -211,6 +216,24 @@ def create_learning_rate_schedule(base_lr, warmup_epochs, total_steps, steps_per
 
     return schedule_fn
 
+def create_train_state(rng, model, learning_rate_fn, weight_decay):
+    """Create initial training state."""
+    # Initialize with dummy input
+    dummy_input = jnp.ones([1, 256, 256, 3])
+    variables = model.init(rng, dummy_input, train=True)
+
+    params = variables["params"]
+    batch_stats = variables.get("batch_stats", None)
+
+    # Create optimizer
+    tx = optax.chain(
+        optax.clip_by_global_norm(1.0),
+        optax.adamw(learning_rate=learning_rate_fn, weight_decay=weight_decay),
+    )
+
+    return TrainState.create(
+        apply_fn=model.apply, params=params, tx=tx, batch_stats=batch_stats
+    )
 
 
 def main(_):
@@ -235,16 +258,22 @@ def main(_):
     test_dataset = create_dataset(
         FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=False
     )
-    print(f"datasets lens: train: {len(train_dataset)}, test: {len(test_dataset)}")
-    print(f"Example batch shape: {next(iter(train_dataset))[0].shape}")
+    print(f"datasets batches: train: {len(train_dataset)}, test: {len(test_dataset)}")
+    print(f"Example batch shape: {next(iter(train_dataset))[0].shape}\n")
     
     steps_per_epoch = len(train_dataset) # At least one step per batch
     total_steps = steps_per_epoch * FLAGS.num_epochs
     
-    # Create learning rate schedule
+    print(f"steps_per_epoch: {steps_per_epoch}, total_steps: {total_steps}")
+    
     learning_rate_fn = create_learning_rate_schedule(
         FLAGS.learning_rate, FLAGS.warmup_epochs, total_steps, steps_per_epoch
     )
+    
+    # Create train state
+    rng, init_rng = jax.random.split(rng)
+    state = create_train_state(init_rng, model, learning_rate_fn, FLAGS.weight_decay)
+
 
 
 
