@@ -115,25 +115,29 @@ def create_train_state(rng, model, learning_rate_fn, weight_decay):
         apply_fn=model.apply, params=params, tx=tx, batch_stats=batch_stats
     )
 
+
 def make_shape_even(image):
-  """Pad the image to have even shapes."""
-  height, width = image.shape[0], image.shape[1]
-  padh = 1 if height % 2 != 0 else 0
-  padw = 1 if width % 2 != 0 else 0
-  image = jnp.pad(image, [(0, padh), (0, padw), (0, 0)], mode='reflect')
-  return image
+    """Pad the image to have even shapes."""
+    height, width = image.shape[0], image.shape[1]
+    padh = 1 if height % 2 != 0 else 0
+    padw = 1 if width % 2 != 0 else 0
+    image = jnp.pad(image, [(0, padh), (0, padw), (0, 0)], mode="reflect")
+    return image
+
 
 def mod_padding_symmetric(image, factor=64):
-  """Padding the image to be divided by factor."""
-  height, width = image.shape[0], image.shape[1]
-  height_pad, width_pad = ((height + factor) // factor) * factor, (
-      (width + factor) // factor) * factor
-  padh = height_pad - height if height % factor != 0 else 0
-  padw = width_pad - width if width % factor != 0 else 0
-  image = jnp.pad(
-      image, [(padh // 2, padh // 2), (padw // 2, padw // 2), (0, 0)],
-      mode='reflect')
-  return image
+    """Padding the image to be divided by factor."""
+    height, width = image.shape[0], image.shape[1]
+    height_pad, width_pad = ((height + factor) // factor) * factor, (
+        (width + factor) // factor
+    ) * factor
+    padh = height_pad - height if height % factor != 0 else 0
+    padw = width_pad - width if width % factor != 0 else 0
+    image = jnp.pad(
+        image, [(padh // 2, padh // 2), (padw // 2, padw // 2), (0, 0)], mode="reflect"
+    )
+    return image
+
 
 def load_image(filepath):
     """Load and preprocess image."""
@@ -176,6 +180,7 @@ def random_rotation(image, target):
     target = np.rot90(target, k=k)
     return image, target
 
+
 def read_lines_from_file(basepath, filepath):
     with open(filepath, "r", encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
@@ -190,55 +195,69 @@ def read_lines_from_file(basepath, filepath):
         else:
             missing.append(p)
 
-    print(f"Checked {len(lines)} files in {basepath}: {len(existing)} existing, {len(missing)} missing.")
+    print(
+        f"Checked {len(lines)} files in {basepath}: {len(existing)} existing, {len(missing)} missing."
+    )
 
     return existing, missing
 
+
 def pre_process(input_file):
-  '''
-  Pre-process the image before sending to the model
-  '''
-  input_img = load_image(input_file)
-  # Padding images to have even shapes
-  height, width = input_img.shape[0], input_img.shape[1]
-  input_img = make_shape_even(input_img)
-  height_even, width_even = input_img.shape[0], input_img.shape[1]
+    """
+    Pre-process the image before sending to the model
+    """
+    input_img = load_image(input_file)
+    # Padding images to have even shapes
+    height, width = input_img.shape[0], input_img.shape[1]
+    input_img = make_shape_even(input_img)
+    height_even, width_even = input_img.shape[0], input_img.shape[1]
 
-  # padding images to be multiplies of 64
-  input_img = mod_padding_symmetric(input_img, factor=64)
-  input_img = np.expand_dims(input_img, axis=0)
+    # padding images to be multiplies of 64
+    input_img = mod_padding_symmetric(input_img, factor=64)
+    input_img = np.expand_dims(input_img, axis=0)
 
-  return input_img, height, width, height_even, width_even
+    return input_img, height, width, height_even, width_even
+
 
 def post_process(preds, height, width, height_even, width_even):
-  '''
-  Post process the image coming out from prediction
-  '''
-  if isinstance(preds, list):
-    preds = preds[-1]
+    """
+    Post process the image coming out from prediction
+    """
     if isinstance(preds, list):
-      preds = preds[-1]
+        preds = preds[-1]
+        if isinstance(preds, list):
+            preds = preds[-1]
 
-  # De-ensemble by averaging inferenced results.
-  preds = np.array(preds[0], np.float32)
+    # De-ensemble by averaging inferenced results.
+    preds = np.array(preds[0], np.float32)
 
-  # unpad images to get the original resolution
-  new_height, new_width = preds.shape[0], preds.shape[1]
-  h_start = new_height // 2 - height_even // 2
-  h_end = h_start + height
-  w_start = new_width // 2 - width_even // 2
-  w_end = w_start + width
-  preds = preds[h_start:h_end, w_start:w_end, :]
-  return np.array((np.clip(preds, 0., 1.) * 255.).astype(jnp.uint8))
+    # unpad images to get the original resolution
+    new_height, new_width = preds.shape[0], preds.shape[1]
+    h_start = new_height // 2 - height_even // 2
+    h_end = h_start + height
+    w_start = new_width // 2 - width_even // 2
+    w_end = w_start + width
+    preds = preds[h_start:h_end, w_start:w_end, :]
+    return np.array((np.clip(preds, 0.0, 1.0) * 255.0).astype(jnp.uint8))
 
 
 def create_dataset(data_dir, batch_size, patch_size, is_training=True):
     """Create TensorFlow dataset for training/validation."""
-    
-    print(f"Creating {'training' if is_training else 'validation'} dataset from {data_dir}")
-    input_dir = os.path.join(data_dir, "train") if is_training else os.path.join(data_dir, "test")
+
+    print(
+        f"Creating {'training' if is_training else 'validation'} dataset from {data_dir}"
+    )
+    input_dir = (
+        os.path.join(data_dir, "train")
+        if is_training
+        else os.path.join(data_dir, "test")
+    )
     target_dir = os.path.join(data_dir, "GT")
-    files_list = os.path.join(data_dir, "train.txt") if is_training else os.path.join(data_dir, "test.txt")
+    files_list = (
+        os.path.join(data_dir, "train.txt")
+        if is_training
+        else os.path.join(data_dir, "test.txt")
+    )
 
     # # Alternatively, you can load all files in the directory
     # input_files = sorted(tf.io.gfile.glob(os.path.join(input_dir, "*")))
@@ -258,7 +277,7 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
         input_img = make_shape_even(input_img)
         target_img = make_shape_even(target_img)
         even_h, even_w = input_img.shape[:2]
-        
+
         # Padding images to be multiples of 64
         input_img = mod_padding_symmetric(input_img, factor=64)
         target_img = mod_padding_symmetric(target_img, factor=64)
@@ -294,6 +313,7 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
     return dataset
+
 
 def resize_target_to(pred, target):
     """Downsample target if necessary to match prediction shape."""
@@ -346,8 +366,8 @@ def compute_psnr(pred, target):
     target_255 = target * 255.0
 
     mse = jnp.mean((pred_255 - target_255) ** 2)
-    mse = jnp.maximum(mse, 1e-6) # Avoid division by zero
-    
+    mse = jnp.maximum(mse, 1e-6)  # Avoid division by zero
+
     psnr = 20.0 * jnp.log10(255.0 / jnp.sqrt(mse))
     return psnr
 
@@ -368,9 +388,11 @@ def train_step(state, batch_input, batch_target, num_scales, rng):
             )
             new_batch_stats = updates["batch_stats"]
         else:
-            preds = state.apply_fn({"params": params}, batch_input, train=True, rngs=rngs)
+            preds = state.apply_fn(
+                {"params": params}, batch_input, train=True, rngs=rngs
+            )
             new_batch_stats = None
-            
+
         loss = compute_loss(preds, batch_target, num_scales)
 
         # Get final prediction for metrics
@@ -426,12 +448,16 @@ def train_epoch(state, train_dataset, num_scales, epoch):
         batch_target = jnp.array(batch_target)
         orig_h, orig_w, even_h, even_w, pad_h, pad_w = jnp.array(sizes)
 
-        if( batch_input.shape != batch_target.shape):
-            print(f"Skipping step {step} due to shape mismatch: input {batch_input.shape}, target {batch_target.shape}")
+        if batch_input.shape != batch_target.shape:
+            print(
+                f"Skipping step {step} due to shape mismatch: input {batch_input.shape}, target {batch_target.shape}"
+            )
             continue
-        
+
         rng, step_rng = jax.random.split(jax.random.PRNGKey(epoch * 1000 + step))
-        state, metrics = train_step(state, batch_input, batch_target, num_scales, step_rng)
+        state, metrics = train_step(
+            state, batch_input, batch_target, num_scales, step_rng
+        )
         batch_metrics.append(metrics)
 
         if (step + 1) % FLAGS.log_every == 0:
@@ -470,6 +496,16 @@ def evaluate(state, val_dataset):
     return avg_metrics
 
 
+def build_model(task="Enhancement"):
+    model_mod = importlib.import_module(f"maxim.models.{_MODEL_FILENAME}")
+    model_configs = ml_collections.ConfigDict(_MODEL_CONFIGS)
+
+    model_configs.variant = _MODEL_VARIANT_DICT[task]
+
+    model = model_mod.Model(**model_configs)
+    return model
+
+
 def main(_):
     # Set random seed
     rng = jax.random.PRNGKey(42)
@@ -478,10 +514,7 @@ def main(_):
     os.makedirs(FLAGS.output_dir, exist_ok=True)
 
     # Load model
-    model_mod = importlib.import_module(f"maxim.models.{_MODEL_FILENAME}")
-    model_configs = ml_collections.ConfigDict(_MODEL_CONFIGS)
-    model_configs.variant = _MODEL_VARIANT_DICT[FLAGS.task]
-    model = model_mod.Model(**model_configs)
+    model = build_model(task=FLAGS.task)
 
     # Create datasets
     train_dataset = create_dataset(
@@ -518,7 +551,7 @@ def main(_):
     for epoch in range(FLAGS.num_epochs):
         # Training
         state, train_metrics = train_epoch(
-            state, train_dataset, model_configs.num_supervision_scales, epoch
+            state, train_dataset, _MODEL_CONFIGS.num_supervision_scales, epoch
         )
 
         logging.info(
