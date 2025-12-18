@@ -863,11 +863,11 @@ class MAXIM(nn.Module):
             outputs.append(output)
             sam_features.append(sam)
           else:  # Last stage, apply output convolutions
-            output = Conv3x3(self.num_outputs,
-                             use_bias=self.use_bias,
-                             name=f"stage_{idx_stage}_output_conv_{i}")(x)
-            output = output + shortcuts[i]
-            outputs.append(output)
+            # output = Conv3x3(self.num_outputs,
+            #                  use_bias=self.use_bias,
+            #                  name=f"stage_{idx_stage}_output_conv_{i}")(x)
+            # output = output + shortcuts[i]
+            outputs.append(output) # return features instead of image, for MoE usage
       # Cache encoder and decoder features for later-stage's usage
       encs_prev = encs[::-1]
       decs_prev = decs
