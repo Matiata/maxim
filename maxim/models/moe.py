@@ -1,5 +1,5 @@
-from maxim import MAXIM
-from router import RouterModel
+from maxim.models.maxim import MAXIM
+from maxim.models.router import RouterModel
 import functools
 from flax import linen as nn
 import jax.numpy as jnp
