@@ -27,9 +27,8 @@ class MaximMoE(nn.Module):
         gates = nn.softmax(router_logits, axis=-1)  # [B, E]
 
         # MAXIM features
-        outputs_all = self.maxim(x, train=train)
-        feats = outputs_all[-1][-1]  # [B, H, W, C]
-
+        feats = self.maxim(x, train=train, return_features=True)
+        print(f"feats shape: {feats.shape}")
         # Expert projections
         expert_outputs = []
         for expert in self.experts:
