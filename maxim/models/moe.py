@@ -13,7 +13,7 @@ class ExpertHead(nn.Module):
 
     @nn.compact
     def __call__(self, x):
-        x = Conv3x3(self.out_channels, use_bias=self.use_bias)(x)
+        x = Conv3x3(self.out_channels, padding="SAME", use_bias=self.use_bias, name="output_conv")(x)
         return x
 
 class MaximMoE(nn.Module):

@@ -666,7 +666,7 @@ class MAXIM(nn.Module):
   dropout_rate: float = 0.0
 
   @nn.compact
-  def __call__(self, x: jnp.ndarray, *, train: bool = False) -> Any:
+  def __call__(self, x: jnp.ndarray, *, train: bool = False, return_features: bool = False) -> Any:
 
     n, h, w, c = x.shape  # input image shape
     shortcuts = []
@@ -850,7 +850,7 @@ class MAXIM(nn.Module):
 
         # Cache decoder features for later-stage's usage
         decs.append(x)
-
+        final_features = None
         # output conv, if not final stage, use supervised-attention-block.
         if i < self.num_supervision_scales:
           if idx_stage < self.num_stages - 1:  # not last stage, apply SAM
@@ -863,18 +863,23 @@ class MAXIM(nn.Module):
             outputs.append(output)
             sam_features.append(sam)
           else:  # Last stage, apply output convolutions
-            # output = Conv3x3(self.num_outputs,
-            #                  use_bias=self.use_bias,
-            #                  name=f"stage_{idx_stage}_output_conv_{i}")(x)
-            # output = output + shortcuts[i]
-            outputs.append(output) # return features instead of image, for MoE usage
+            final_features = x
+            output = Conv3x3(self.num_outputs,
+                             use_bias=self.use_bias,
+                             name=f"stage_{idx_stage}_output_conv_{i}")(x)
+            output = output + shortcuts[i]
+            outputs.append(output)
       # Cache encoder and decoder features for later-stage's usage
       encs_prev = encs[::-1]
       decs_prev = decs
 
       # Store outputs
       outputs_all.append(outputs)
-    return outputs_all
+
+      if self.return_features:
+        # returning final features instead of outputs allows to connect with MoE Router
+        return final_features
+      return outputs_all
 
 
 def Model(*, variant=None, **kw):
