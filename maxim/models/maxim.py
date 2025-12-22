@@ -876,6 +876,8 @@ class MAXIM(nn.Module):
       # Store outputs
       outputs_all.append(outputs)
 
+      print(f"maxim return_features: {return_features}, final_features shape: {final_features.shape if final_features is not None else None}")
+
       if return_features:
         # returning final features instead of outputs allows to connect with MoE Router
         return final_features
