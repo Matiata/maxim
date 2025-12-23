@@ -816,6 +816,7 @@ class MAXIM(nn.Module):
 
       # start decoder. Multi-scale feature fusion of cross-gated features
       outputs, decs, sam_features = [], [], []
+      final_features = None
       for i in reversed(range(self.depth)):
         # use larger blocksize at high-res stages
         block_size = self.block_size_hr if i < self.high_res_stages else self.block_size_lr
@@ -851,7 +852,6 @@ class MAXIM(nn.Module):
         # Cache decoder features for later-stage's usage
         decs.append(x)
         # set final features for return_features=True
-        final_features = None
         cond = idx_stage == self.num_stages - 1 and i == self.depth - 1
         print(f"idx_stage: {idx_stage}, i: {i}, num_stages: {self.num_stages}, depth: {self.depth}, x shape: {x.shape}, cond: {cond}")
         if cond:
