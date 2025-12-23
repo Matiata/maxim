@@ -875,7 +875,7 @@ class MAXIM(nn.Module):
       if idx_stage == self.num_stages - 1:
         print(f"setting final_features to x shape: {x.shape} \n {x}")
         final_features = x
-      print(f"final_features: {final_features}, idx_stage:{idx_stage}")
+      print(f"final_features: {final_features}, idx_stage:{idx_stage}, num_stages:{self.num_stages}, cond:{idx_stage == self.num_stages - 1}")
 
       # Store outputs
       outputs_all.append(outputs)
