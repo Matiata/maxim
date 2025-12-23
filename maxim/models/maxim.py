@@ -852,9 +852,10 @@ class MAXIM(nn.Module):
         decs.append(x)
         # set final features for return_features=True
         final_features = None
-        if idx_stage == self.num_stages - 1 and i == 0:
-          final_features = x
         print(f"final_features: {final_features}, idx_stage:{idx_stage}, i:{i}")
+        if idx_stage == self.num_stages - 1 and i == 0:
+          print(f"setting final_features to x shape: {x.shape} \n {x}")
+          final_features = x
         # output conv, if not final stage, use supervised-attention-block.
         if i < self.num_supervision_scales:
           if idx_stage < self.num_stages - 1:  # not last stage, apply SAM
