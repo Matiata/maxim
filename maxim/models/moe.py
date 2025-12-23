@@ -35,6 +35,7 @@ class MaximMoE(nn.Module):
             expert_outputs.append(expert(feats))
 
         expert_outputs = jnp.stack(expert_outputs, axis=1)
+        print(f"expert_outputs shape: {expert_outputs.shape}")
         # [B, E, H, W, 3]
 
         # Mixture
