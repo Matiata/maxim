@@ -852,7 +852,7 @@ class MAXIM(nn.Module):
         # Cache decoder features for later-stage's usage
         decs.append(x)
         # set final features for return_features=True
-        cond = idx_stage == self.num_stages - 1 and i == 1
+        cond = idx_stage == self.num_stages - 1 and i == 0
         print(f"idx_stage: {idx_stage}, i: {i}, num_stages: {self.num_stages}, depth: {self.depth}, x shape: {x.shape}, cond: {cond}")
         if cond:
           final_features = x
