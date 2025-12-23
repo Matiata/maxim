@@ -852,9 +852,7 @@ class MAXIM(nn.Module):
         # Cache decoder features for later-stage's usage
         decs.append(x)
         # set final features for return_features=True
-        cond = idx_stage == self.num_stages - 1 and i == 0
-        print(f"idx_stage: {idx_stage}, i: {i}, num_stages: {self.num_stages}, depth: {self.depth}, x shape: {x.shape}, cond: {cond}")
-        if cond:
+        if idx_stage == self.num_stages - 1 and i == 0:
           final_features = x
 
         # output conv, if not final stage, use supervised-attention-block.
@@ -880,8 +878,6 @@ class MAXIM(nn.Module):
 
       # Store outputs
       outputs_all.append(outputs)
-
-    print(f"maxim return_features: {return_features}, final_features shape: {final_features.shape if final_features is not None else None}")
 
     if return_features:
       # returning final features instead of outputs allows to connect with MoE Router

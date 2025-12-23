@@ -28,14 +28,14 @@ class MaximMoE(nn.Module):
 
         # MAXIM features
         feats = self.maxim(x, train=train, return_features=True)
-        print(f"feats shape: {feats.shape}")
+        print(f"maxim features shape: {feats.shape}")
         # Expert projections
         expert_outputs = []
         for expert in self.experts:
             expert_outputs.append(expert(feats))
 
         expert_outputs = jnp.stack(expert_outputs, axis=1)
-        print(f"expert_outputs shape: {expert_outputs.shape}")
+        print(f"expert outputs shape: {expert_outputs.shape}")
         # [B, E, H, W, 3]
 
         # Mixture
