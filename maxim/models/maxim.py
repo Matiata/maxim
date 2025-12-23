@@ -852,7 +852,8 @@ class MAXIM(nn.Module):
         decs.append(x)
         # set final features for return_features=True
         final_features = None
-        if idx_stage == self.num_stages - 1 and i == 0:
+        print(f"idx_stage: {idx_stage}, i: {i}, depth: {self.depth}, num_stages: {self.num_stages}, x shape: {x.shape}")
+        if idx_stage == self.num_stages - 1 and i == self.depth - 1:
           final_features = x
 
         # output conv, if not final stage, use supervised-attention-block.
