@@ -850,7 +850,10 @@ class MAXIM(nn.Module):
 
         # Cache decoder features for later-stage's usage
         decs.append(x)
+        # set final features for return_features=True
         final_features = None
+        if idx_stage == self.num_stages - 1 and i == 0:
+          final_features = x
         # output conv, if not final stage, use supervised-attention-block.
         if i < self.num_supervision_scales:
           if idx_stage < self.num_stages - 1:  # not last stage, apply SAM
@@ -863,7 +866,6 @@ class MAXIM(nn.Module):
             outputs.append(output)
             sam_features.append(sam)
           else:  # Last stage, apply output convolutions
-            final_features = x
             output = Conv3x3(self.num_outputs,
                              use_bias=self.use_bias,
                              name=f"stage_{idx_stage}_output_conv_{i}")(x)
