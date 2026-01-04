@@ -36,7 +36,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum(
     "task",
-    "Denoising",
+    "Deblurring",
     ["Denoising", "Deblurring", "Deraining", "Dehazing", "Enhancement"],
     "Task to train.",
 )
@@ -268,6 +268,7 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
 
     def load_and_preprocess(input_path, target_path):
         """Load and preprocess a single pair of images."""
+        print("READ →", input_path.numpy().decode())
         input_img = load_image(input_path.numpy().decode())
         target_img = load_image(target_path.numpy().decode())
 
@@ -312,7 +313,7 @@ def create_dataset(data_dir, batch_size, patch_size, is_training=True):
     dataset = dataset.batch(batch_size, drop_remainder=is_training)
     dataset = dataset.prefetch(tf.data.AUTOTUNE)
 
-    return dataset
+    return dataset, len(input_files)
 
 
 def resize_target_to(pred, target):
@@ -441,15 +442,15 @@ def eval_step(state, batch_input, batch_target):
 def train_epoch(state, train_dataset, num_scales, epoch):
     """Train for one epoch."""
     batch_metrics = []
-    print("Starting training epoch", epoch)
+    logging.info(f"Starting training epoch {epoch + 1}")
     for step, (batch_input, batch_target, sizes) in enumerate(train_dataset):
-        print(f"Training epoch {epoch}, step {step}...")
+        logging.info(f"Training epoch {epoch + 1}, step {step}...")
         batch_input = jnp.array(batch_input)
         batch_target = jnp.array(batch_target)
         orig_h, orig_w, even_h, even_w, pad_h, pad_w = jnp.array(sizes)
 
         if batch_input.shape != batch_target.shape:
-            print(
+            logging.warning(
                 f"Skipping step {step} due to shape mismatch: input {batch_input.shape}, target {batch_target.shape}"
             )
             continue
@@ -496,7 +497,7 @@ def evaluate(state, val_dataset):
     return avg_metrics
 
 
-def build_model(task="Enhancement"):
+def build_model(task="Deblurring"):
     model_mod = importlib.import_module(f"maxim.models.{_MODEL_FILENAME}")
     model_configs = ml_collections.ConfigDict(_MODEL_CONFIGS)
 
@@ -517,15 +518,15 @@ def main(_):
     model = build_model(task=FLAGS.task)
 
     # Create datasets
-    train_dataset = create_dataset(
+    train_dataset, train_size = create_dataset(
         FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=True
     )
-    test_dataset = create_dataset(
+    test_dataset, test_size = create_dataset(
         FLAGS.dataset_dir, FLAGS.batch_size, FLAGS.patch_size, is_training=False
     )
 
     # Calculate steps
-    train_size = len(list(train_dataset))
+    train_size = train_size // FLAGS.batch_size
     steps_per_epoch = train_size
     total_steps = steps_per_epoch * FLAGS.num_epochs
 
@@ -547,8 +548,11 @@ def main(_):
     logging.info(f"Total steps: {total_steps}, Steps per epoch: {steps_per_epoch}")
 
     best_psnr = 0.0
+    
+    logging.info(f"Training for {range(FLAGS.num_epochs)} epochs...")
 
     for epoch in range(FLAGS.num_epochs):
+        logging.info(f"Epoch {epoch + 1}/{FLAGS.num_epochs}")
         # Training
         state, train_metrics = train_epoch(
             state, train_dataset, _MODEL_CONFIGS.num_supervision_scales, epoch
