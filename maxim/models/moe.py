@@ -24,18 +24,18 @@ class MaximMoE(nn.Module):
     def __call__(self, x, train=True):
         # Router on the image
         router_logits = self.router(x, train=train)
-        gates = nn.softmax(router_logits, axis=-1)  # [B, E]
+        temperature = 1.5 if train else 1.0
+        gates = nn.softmax(router_logits / temperature, axis=-1)  # [B, E]
 
         # MAXIM features
         feats = self.maxim(x, train=train, return_features=True)
-        print(f"maxim features shape: {feats.shape}")
+        # print(f"maxim features shape: {feats.shape}")
         # Expert projections
         expert_outputs = []
         for expert in self.experts:
             expert_outputs.append(expert(feats))
 
         expert_outputs = jnp.stack(expert_outputs, axis=1)
-        print(f"expert outputs shape: {expert_outputs.shape}")
         # [B, E, H, W, 3]
 
         # Mixture
@@ -45,4 +45,4 @@ class MaximMoE(nn.Module):
         # Residual
         mixed = mixed + x
 
-        return mixed, gates
+        return mixed, gates.squeeze((2,3,4))
