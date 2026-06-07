@@ -1,0 +1,460 @@
+%% ****** Start of file apstemplate.tex ****** %
+%%
+%%
+%%   This file is part of the APS files in the REVTeX 4.2 distribution.
+%%   Version 4.2a of REVTeX, January, 2015
+%%
+%%
+%%   Copyright (c) 2015 The American Physical Society.
+%%
+%%   See the REVTeX 4 README file for restrictions and more information.
+%%
+%
+% This is a template for producing manuscripts for use with REVTEX 4.2
+% Copy this file to another name and then work on that file.
+% That way, you always have this original template file to use.
+%
+% Group addresses by affiliation; use superscriptaddress for long
+% author lists, or if there are many overlapping affiliations.
+% For Phys. Rev. appearance, change preprint to twocolumn.
+% Choose pra, prb, prc, prd, pre, prl, prstab, prstper, or rmp for journal
+%  Add 'draft' option to mark overfull boxes with black boxes
+%  Add 'showkeys' option to make keywords appear
+%\documentclass[aps,prl,preprint,groupedaddress]{revtex4-2}
+\documentclass[aps,prl,twocolumn,groupedaddress]{revtex4-2}
+%\documentclass[aps,prl,preprint,superscriptaddress]{revtex4-2}
+%\documentclass[aps,prl,reprint,groupedaddress]{revtex4-2}
+
+% You should use BibTeX and apsrev.bst for references
+% Choosing a journal automatically selects the correct APS
+% BibTeX style file (bst file), so only uncomment the line
+% below if necessary.
+%\bibliographystyle{apsrev4-2}
+
+\usepackage{graphicx}
+\usepackage{epstopdf}
+%\usepackage{amsmath}% http://ctan.org/pkg/amsmath
+%\usepackage{amsthm}
+%\usepackage{amsfonts}
+%\usepackage{subfigure}
+%\usepackage{hhline}
+%\usepackage[miktex]{gnuplottex}
+%\usepackage{xcolor}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{color}
+\usepackage{hyperref}
+%\usepackage[percent]{overpic}
+\usepackage{tikz}
+\usepackage{mathrsfs}
+\usepackage{wasysym}
+\usepackage{tikz-cd}
+%\usepackage{stix} %\fisheye
+\usepackage{stackengine,scalerel}
+\usepackage{multirow}
+
+% so sections, subsections, etc. become numerated.
+\setcounter{secnumdepth}{3}
+
+% Comandos proprios
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\avrg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\nelta}{\bar{\delta}}
+\newcommand{\bra}[1]{\left\langle #1\right|}
+\newcommand{\ket}[1]{\left| #1 \right\rangle}
+\newcommand{\sbra}[1]{\langle #1|}
+\newcommand{\sket}[1]{| #1 \rangle}
+\newcommand{\bek}[3]{\left\langle #1 \right| #2 \left| #3 \right\rangle}
+\newcommand{\sbek}[3]{\langle #1 | #2 | #3 \rangle}
+\newcommand{\braket}[2]{\left\langle #1 \middle| #2 \right\rangle}
+\newcommand{\ketbra}[2]{\left| #1 \middle\rangle \middle\langle #2  \right|}
+\newcommand{\sbraket}[2]{\langle #1 | #2 \rangle}
+\newcommand{\sketbra}[2]{| #1 \rangle  \langle #2 |}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\snorm}[1]{\lVert#1\rVert}
+\newcommand{\bvec}[1]{\boldsymbol{\mathsf{#1}}}
+\newcommand{\bcov}[1]{\boldsymbol{#1}}
+\newcommand{\bdua}[1]{\boldsymbol{\check{#1}}}
+%\newcommand{\bdov}[1]{\boldsymbol{\breve{#1}}}
+\newcommand{\bdov}[1]{\breve{#1}}
+%\newcommand{\bten}[1]{\boldsymbol{\mathfrak{#1}}}
+\newcommand{\bten}[1]{\boldsymbol{\mathfrak{#1}}}
+\newcommand{\forany}{\tilde{\forall}}
+\newcommand{\qed}{$\overset{\circ}{.}\;$}
+
+\newcommand\bigeye{\ensurestackMath{\stackinset{c}{}{c}{-.3pt}%
+  {\bullet}{\scriptstyle\bigcirc}}}
+\newcommand\eye{\scalerel*{\bigeye}{x}}
+%\newcommand*{\fisheye}{%
+%    \mathbin{%
+%        \ooalign{$\circledcirc$\cr\hidewidth$\bullet$\hidewidth}%
+%    }%
+%}
+\renewcommand{\appendixname}{Apéndice} % Change "Appendix" to "Apéndice"
+
+\begin{document}
+
+% Use the \preprint command to place your local institutional report
+% number in the upper righthand corner of the title page in preprint mode.
+% Multiple \preprint commands are allowed.
+% Use the 'preprintnumbers' class option to override journal defaults
+% to display numbers if necessary
+%\preprint{}
+
+%Title of paper
+\title{
+Restauración de imágnes usando MAXIM
+}
+
+% repeat the \author .. \affiliation  etc. as needed
+% \email, \thanks, \homepage, \altaffiliation all apply to the current
+% author. Explanatory text should go in the []'s, actual e-mail
+% address or url should go in the {}'s for \email and \homepage.
+% Please use the appropriate macro foreach each type of information
+
+% \affiliation command applies to all authors since the last
+% \affiliation command. The \affiliation command should follow the
+% other information
+% \affiliation can be followed by \email, \homepage, \thanks as well.
+\author{Matías Ariel Murat}
+% \email[]{matias.murat@mi.unc.edu.ar}
+\affiliation{Facultad de Matem\'atica, Astronom\'ia, F\'isica y Computaci\'on, Universidad Nacional de C\'ordoba, Ciudad Universitaria, 5000 C\'ordoba, Argentina}
+
+%Collaboration name if desired (requires use of superscriptaddress
+%option in \documentclass). \noaffiliation is required (may also be
+%used with the \author command).
+%\collaboration can be followed by \email, \homepage, \thanks as well.
+%\collaboration{Juan Perez}
+%\noaffiliation
+
+% \date{\today}
+
+\begin{abstract}
+En este informe, implementamos un autoencoder convolucional en Fashion MNIST, una vez entrenado usamos su encoder para implementar un clasificador convolucional. Exploramos hiperparámetros y configuraciones para las capas convolucionales. Entrenamos de distintas formas el clasificador, y con distintos codificadores, buscando mejorar la precisión y profundizar nuestro entendimiento en estas redes.
+\end{abstract}
+
+% insert suggested keywords - APS authors don't need to do this
+%\keywords{}
+
+%\maketitle must follow title, authors, abstract, and keywords
+\maketitle
+
+\section{Introducción}
+
+
+\section{Teoría}
+
+MAXIM (Multi Axis MLP) es una arquitectura que puede usarse como una base efectiva  y flexible para tareas de visión por computadora y procesamiento de imágenes. Está inspirada en una arquitectura en forma de U (U-shaped), lo que le permite combinar información de bajo y alto nivel mediante conexiones skip. A diferencia de arquitecturas puramente convolucionales, MAXIM incorpora bloques basados en MLP que habilitan interacciones de largo alcance entre los elementos de la imagen.
+
+En particular, MAXIM se compone de dos bloques principales. El primero es un MLP con regulación por compuertas multieje (multi-axis gated MLP), diseñado para permitir la interacción entre elementos visuales locales y globales, conectando distintas etapas del procesado de la imagen.
+
+En particular MAXIM tiene dos bloques: un MLP con regulación por compuertas multieje que permite interacción entre elementos visuales locales y globales, y un bloque de compuertas cruzadas, una alternativa a la atención cruzada. Ambos módulos están basados en MLP y tienen el beneficio de ser globales y completamente convolucionales, dos propiedades deseables para el procesamiento de imágenes.
+
+Muchos investigadores han diseñado e implementado módulos individuales  para tareas de visión de bajo nivel, incluyendo aprendizaje residual, conexiones densas, estructuras jerárquicas, frameworks multi etapa y mecanismos de atención, MAXIM implementa varias de estas brindando propiedades deseables, para tareas de procesamiento de imágenes. Primero MAXIM expresa campos receptivos globales en imágenes arbitrariamente grandes y escala linealmente con el tamaño. Segundo, soporta directamente inputs de resoluciones arbitrarias, ie,. es fully-convolutional. Por último, provee un diseño balanceado de bloque locales(Conv) y globales(MLP), mejorando el performance de los mejores métodos sin necesidad de pre-entrenamiento de gran escala.
+
+MAXIM esta implementado usando FLAX, una librería python de redes neuronales, construida sobre JAX, una librería de computación numérica de alto performance. FLAX/JAX permiten usar diferenciación automática o algorítmica, mas eficiente que los métodos clásicos de diferenciación numérica o simbólica. Otra ventaja de JAX es que permite la compilación JIT(just-in-time), una técnica que combina interpretación y compilación. Consiste en compilar y optimizar dinámicamente los métodos más usados durante la ejecución, combinando ventajas como la velocidad del código compilado y la flexibilidad del interpretado.
+
+En su propuesta original, MAXIM utiliza un único camino de cómputo compartido para todas las entradas. Sin embargo, este enfoque puede resultar subóptimo cuando el modelo debe enfrentarse a múltiples tareas o a distribuciones de datos heterogéneas. Para abordar esta limitación, se introduce el paradigma de Mixture of Experts (MoE), el cual permite que diferentes subconjuntos del modelo se especialicen en distintos tipos de entradas o tareas.
+
+En su propuesta original, MAXIM utiliza el mismo camino para todas las entradas y se especializa en resolver una única tarea de restauración. Sin embargo, este enfoque puede resultar subóptimo cuando el modelo debe enfrentarse a varios tipos de tarea o datos diferentes entre si. Para superar esta limitación, se introduce la técnica de Mixture of Experts (MoE), con la cual se divide el problema en subconjuntos de tareas y se implementan múltiples expertos.
+
+En este trabajo se adopta una variante del paradigma Mixture of Experts adaptada a la arquitectura de MAXIM y a las restricciones prácticas del entorno de entrenamiento. En lugar de replicar bloques internos del modelo, se utiliza un único backbone MAXIM compartido que extrae representaciones de alto nivel a partir de la imagen de entrada. Sobre estas características se introduce un mecanismo de ruteo al final de la red, el cual selecciona dinámicamente entre múltiples expertos encargados de realizar la proyección final desde el espacio de características hacia la predicción de salida.
+
+En este esquema, los expertos no procesan directamente la imagen ni participan en las etapas tempranas de extracción de características, sino que operan exclusivamente sobre la representación latente producida por MAXIM. Cada experto implementa una cabeza de salida especializada, lo que permite modelar distintas distribuciones o tipos de degradación sin duplicar el costo computacional del backbone. Esta decisión está motivada principalmente por limitaciones técnicas, en particular el consumo de memoria asociado a la replicación de bloques globales basados en MLP, cuyo costo crece linealmente con la resolución espacial.
+
+Desde el punto de vista computacional, esta arquitectura conserva las ventajas fundamentales de MAXIM —como su carácter fully-convolutional y su capacidad para procesar imágenes de tamaño arbitrario— mientras introduce especialización a nivel de salida con un incremento marginal en el número de parámetros activos. El mecanismo de ruteo actúa entonces como un selector de hipótesis, asignando cada entrada al experto más adecuado en función de sus características globales.
+
+Este enfoque puede interpretarse como un compromiso entre capacidad y eficiencia: si bien la especialización ocurre en una etapa tardía del procesamiento, los expertos disponen de representaciones ricas y globales, lo que resulta suficiente para capturar variaciones complejas en la tarea de reconstrucción. Al mismo tiempo, se evita la fragmentación del aprendizaje en las capas profundas, reduciendo tanto el uso de memoria como la complejidad del entrenamiento.
+
+
+\section{Resultados}
+\subsection{Cantidad de neuronas}
+En nuestro clasificador convolucional la salida del encoder está conectada a la capa lineal del clasificador, por eso deben tener el mismo tamaño. Inicialmente implementamos la red con $n_0 = 64$ neuronas en esta capa. Luego, entrenamos redes con $n_1 = 86$ y $n_2 = 128$ neuronas. En la fig.\ref{fig1} podemos los errores de ambas redes durante el entrenamiento.
+\begin{figure}[!!!ttt]
+\includegraphics*[scale=0.5]{figs/autoencoder-neurons-label.png}
+\put(-215,100){\bf a)}
+\hspace{+0.1cm}
+\includegraphics*[scale=0.5]{figs/classifier-neurons-label.png}
+\put(-215,100){\bf b)}
+\caption{
+\label{fig1}
+Variaciones en la cantidad de neuronas, linea continua: conjunto de validación, linea punteada: conjunto de entrenamiento 
+{\bf a)} 
+Error en el autoencoder
+{\bf b)} 
+Error en el clasificador
+}
+\end{figure}
+
+Hay que tener cuidado al comparar estos gráficos, ya que tienen distintas escalas en el eje vertical. Aun así, podemos apreciar que el incremento de neuronas resulta en una reducción del error más pronunciada en el autoencoder que en el clasificador. En el clasificador también se mejora el rendimiento, pero la mejora significativa es al pasar de $64$ a $86$ neuronas y no tanto con $128$. 
+
+De todas formas, si observamos la linea punteada, que indica el error sobre el conjunto de entrenamiento, notamos que no está demasiado separada del error de validación. Esto indica que no hay overfitting y por lo tanto usaremos la configuración con $128$ neuronas.
+
+\subsection{Entrenamiento parcial}
+Como ya mencionamos, el encoder se entrena primero al implementarse en el autoencoder y luego se usa en el clasificador, donde se re-entrena. Sin embargo, al implementar el clasificador podemos indicarle al optimizador que ajuste solo la capa lineal del clasificador, sin afectar al encoder. Como el encoder está pre-entrenado podríamos esperar que tenga un rendimiento razonablemente bueno, aun sin entrenarlo en la nueva red. 
+
+% \vspace{-10cm}
+\begin{figure}[!!!ttt]
+\includegraphics*[scale=0.5]{figs/classifier-half-label.png}
+\put(-215,100){\bf a)}
+\hspace{+0.1cm}
+\includegraphics*[scale=0.5]{figs/classifier-half-precision-label.png}
+\put(-215,100){\bf b)}
+\caption{
+\label{fig2}
+Variaciones en el entrenamiento, linea continua: conjunto de validación, linea punteada: conjunto de entrenamiento, en rojo entrenamiento completo, en azul entrenamiento solo del clasificador
+{\bf a)} 
+Error en el tiempo
+{\bf b)} 
+Precisión en el tiempo
+}
+\end{figure}
+
+En la fig.\ref{fig2} podemos observar error y precisión del clasificador durante el entrenamiento. Notamos que el clasificador funciona bastante mejor al entrenar la red completa. Esto puede deberse a que, si bien el encoder detecta características importantes para la compresión de las imágenes, estas pueden ser distintas de las características útiles para la clasificación. Luego, es importante re-entrenar el encoder junto con toda la red clasificadora.
+
+El tiempo de entrenamiento de la red completa es: $1140.7$ segundos y $1174.3$ segundos entrenando solo el clasificador. La diferencia registrada es pequeña y por lo tanto no es un factor a tener en cuenta.
+
+\subsection{Filtros}
+Ya mencionamos la importancia de los filtros en las capas convolucionales. Realizamos ajustes en el tamaño del primer filtro convolucional y comparamos el rendimiento del autoencoder. Recordemos que nuestro kernel inicial es de tamaño $(3,3)$, implementamos redes donde este filtro es: $(4,4)$ y $(6,6)$.
+\begin{figure}[!!!ttt]
+\includegraphics*[scale=0.5]{figs/autoencoder-kernels.png}
+\put(-215,100){\bf a)}
+\hspace{+0.1cm}
+\includegraphics*[scale=0.5]{figs/autoencoder-channels.png}
+\put(-215,100){\bf b)}
+\caption{
+\label{fig3}
+Variaciones en los filtros, linea continua: conjunto de validación, linea punteada: conjunto de entrenamiento
+{\bf a)} 
+Error en el autoencoder variando tamaño de filtro
+{\bf b)} 
+Error en el autoencoder variando cantidad de filtros
+}
+\end{figure}
+
+Observando la fig.\ref{fig3}\textbf{a)} notamos que ambos aumentos en el tamaño del filtro empeoran el rendimiento del autoencoder. En el caso del filtro $(4,4)$ el error final es el mismo, pero durante el entrenamiento vemos cambios más pronunciados y algunos aumentos en el error. Por este motivo, mantenemos el tamaño del kernel inicial.
+
+Manteniendo el tamaño inicial del kernel, pero usando más de estos podríamos esperar alguna mejora. Por lo tanto, implementamos un autoencoder con 4 filtros más en cada una de las capas convolucionales. Este es un cambio relativamente pequeño. Sin embargo, en la fig.\ref{fig3}\textbf{b)} podemos ver que aumenta el error del autoencoder. Finalmente dejamos todos los filtros con sus configuraciones iniciales.
+
+
+\section{Discusión}
+
+Al igual que en otros tipos de redes, nuestro autoencoder se benefició de una mayor cantidad de neuronas. Sin embargo, los resultados indican que un número muy alto de estas no necesariamente implica una mejora, puede resultar incluso contraproducente.
+
+Es más interesante el resultado obtenido en cuanto al tipo de entrenamiento, ya que no coincide con lo que esperábamos por intuición. Resulta importante entrenar la red completa al implementar un clasificador convolucional, incluso si el encoder esta pre-entrenado.
+
+En cuanto a los filtros no logramos encontrar una pauta clara para optimizarlos. De nuestros resultados, parece que la red se beneficia de filtros más pequeños. Y al igual que con la cantidad de neuronas, aumentar la cantidad de filtros, no necesariamente resulta en una mejora de la red.
+
+
+\section{Conclusiones}
+Como conclusión, presentamos una tabla con los errores del autoencoder (sobre el conjunto de validación) para cada uno de los experimentos.
+\\
+\begin{center}
+\begin{tabular}{ |p{3cm}|p{3cm}| }
+ \hline
+ \multicolumn{2}{|c|}{Autoencoder} \\
+ \hline
+ Neuronas & Error\\
+ \hline
+ 64 & 0.1106    \\
+ 86 & 0.0868   \\
+ 128 & 0.0733 \\
+ \hline
+ Filtros &\\
+ \hline
+ (3,3) & 0.0733\\
+ (4,4) & 0.0735 \\
+ (6,6) & 0.0841\\
+ \hline
+ Canales &\\
+ \hline
+ 16 y 32 & 0733\\
+ 20 y 36 & 0.077 \\
+ \hline
+\end{tabular}
+\end{center}
+\\
+
+En esta tabla podemos observar rápidamente los resultados ya analizados y ver la configuración más conveniente. Logramos mejorar la precisión del autoencoder aumentando la cantidad de neuronas del mismo. Sin embargo, los demás experimentos realizados no lograron mejoras. Para mejorar el clasificador convolucional es importante que el autoencoder que usamos funcione bien, sin embargo, no deberíamos perder demasiado tiempo en optimizarlo. Como vimos en el experimento de los entrenamientos parciales, es más importante optimizar los hiperparámetros del clasificador.
+
+% If in two-column mode, this environment will change to single-column
+% format so that long equations can be displayed. Use
+% sparingly.
+%\begin{widetext}
+% put long equation here
+%\end{widetext}
+
+% figures should be put into the text as floats.
+% Use the graphics or graphicx packages (distributed with LaTeX2e)
+% and the \includegraphics macro defined in those packages.
+% See the LaTeX Graphics Companion by Michel Goosens, Sebastian Rahtz,
+% and Frank Mittelbach for instance.
+%
+% Here is an example of the general form of a figure:
+% Fill in the caption in the braces of the \caption{} command. Put the label
+% that you will use with \ref{} command in the braces of the \label{} command.
+% Use the figure* environment if the figure should span across the
+% entire page. There is no need to do explicit centering.
+
+% \begin{figure}
+% \includegraphics{}%
+% \caption{\label{}}
+% \end{figure}
+
+% Surround figure environment with turnpage environment for landscape
+% figure
+% \begin{turnpage}
+% \begin{figure}
+% \includegraphics{}%
+% \caption{\label{}}
+% \end{figure}
+% \end{turnpage}
+
+% tables should appear as floats within the text
+%
+% Here is an example of the general form of a table:
+% Fill in the caption in the braces of the \caption{} command. Put the label
+% that you will use with \ref{} command in the braces of the \label{} command.
+% Insert the column specifiers (l, r, c, d, etc.) in the empty braces of the
+% \begin{tabular}{} command.
+% The ruledtabular enviroment adds doubled rules to table and sets a
+% reasonable default table settings.
+% Use the table* environment to get a full-width table in two-column
+% Add \usepackage{longtable} and the longtable (or longtable*}
+% environment for nicely formatted long tables. Or use the the [H]
+% placement option to break a long table (with less control than 
+% in longtable).
+% \begin{table}%[H] add [H] placement to break table across pages
+% \caption{\label{}}
+% \begin{ruledtabular}
+% \begin{tabular}{}
+% Lines of table here ending with \\
+% \end{tabular}
+% \end{ruledtabular}
+% \end{table}
+
+% Surround table environment with turnpage environment for landscape
+% table
+% \begin{turnpage}
+% \begin{table}
+% \caption{\label{}}
+% \begin{ruledtabular}
+% \begin{tabular}{}
+% \end{tabular}
+% \end{ruledtabular}
+% \end{table}
+% \end{turnpage}
+
+%\section{Aknowledgments}
+\section{Agradecimientos}
+
+\begin{acknowledgments}
+MAM agradece a la UNC, en especial a los profesores Juan Ignacio Perotti, Francisco Tamarit y Benjamín Marcolongo
+por su esfuerzo y paciencia para dictar el curso de \textit{Redes Neuronales}.
+\end{acknowledgments}
+% Create the reference section using BibTeX:
+\bibliography{ref}
+
+% Specify following sections are appendices. Use \appendix* if there
+% only one appendix.
+
+\onecolumngrid
+
+
+\begin{table}[ht]
+\centering
+\caption{Dataset summary on five image processing tasks.}
+\begin{tabular}{|l|l|r|r|l|}
+\hline
+Task & Dataset & \#Train & \#Test & Test Dubname \\
+\hline
+\multirow{2}{*}{Denoising} 
+  & SIDD \cite{} & 320  & 40  & SIDD \\
+  & DND \cite{}  & 0    & 50  & DND \\
+\hline
+\multirow{5}{*}{Deblurring} 
+  & GoPro \cite{}      & 2103  & 1111 & GoPro \\
+  & HIDE \cite{}       & 2025  & 1052 & HIDE \\
+  & RealBlur-R \cite{} & 3758  & 980  & RealBlur-R \\
+  & RealBlur-J \cite{} & 3758  & 980  & RealBlur-J \\
+  & REDS \cite{}       & 24000 & 300  & REDS \\
+\hline
+\multirow{9}{*}{Deraining}
+  & Rain1400 \cite{} & 11200 & 2800 & Test2800 \\
+  & Rain1800 \cite{} & 1800  & 0    & - \\
+  & Rain800 \cite{}  & 700   & 98   & Test100 \\
+  & Rain100H \cite{} & 0     & 100  & Rain100H \\
+  & Rain100L \cite{} & 0     & 100  & Rain100L \\
+  & Rain1200 \cite{} & 11200 & 0    & - \\
+  & Rain12 \cite{}   & 12    & 0    & - \\
+  & Raindrop \cite{} & 861   & 58   & Raindrop-A \\
+  & Raindrop \cite{} & 0     & 239  & Raindrop-B \\
+\hline
+\multirow{2}{*}{Dehazing}
+  & RESIDE-ITS \cite{} & 13990  & 500 & SOTS-Indoor \\
+  & RESIDE-OTS \cite{} & 313950 & 500 & SOTS-Outdoor \\
+\hline
+Enhancement (Retouching) 
+  & MIT-Adobe FiveK \cite{} & 4500 & 500 & FiveK \\
+  & LOL \cite{}             & 485  & 15  & LOL \\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+% \appendix
+
+% \section{Modelos}
+
+% \subsection{Modelo 1}
+
+% El código bla bla bla...
+
+% \begin{verbatim}
+% ## Definimos el primer modelo
+% class MultiLayerPerceptron(nn.Module):
+%     def __init__(self):
+%         super().__init__()
+
+%         ## "Achatamos" la matriz de 28x28 píxeles, 
+%         ## transformandola en un vector de 784 elementos
+%         self.flatten = nn.Flatten()
+
+%         ## Definimos el perceptrón multicapa con las
+%         ## siguientes capas:
+%         ##
+%         ## Entrada:        784 neuronas
+%         ## 1º capa oculta: 512 neuronas
+%         ## 2º capa oculta: 512 neuronas
+%         ## Salida:         10  neuronas
+%         ##
+%         ## Entre capa y capa, utilizamos función de 
+%         ## activación ReLU
+%         self.linear_relu_stack = nn.Sequential(
+%             nn.Linear(28*28, 600),
+%             nn.ReLU(),
+%             nn.Linear(600, 120),
+%             nn.ReLU(),
+%             nn.Linear(120, 10),
+%             nn.ReLU()
+%         )
+
+%     def forward(self, x):
+%         x = self.flatten(x)
+%         x = self.linear_relu_stack(x)
+%         return x
+% \end{verbatim}
+
+% \subsection{Modelo 2}
+
+% El código bla bla bla...
+
+% \section{Datos}
+
+% Bla bla bla...
+
+\end{document}
+%
+% ****** End of file apstemplate.tex ******

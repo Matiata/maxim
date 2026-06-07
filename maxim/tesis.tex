@@ -1,0 +1,351 @@
+%% ****** Start of file apstemplate.tex ****** %
+%%
+%%
+%%   This file is part of the APS files in the REVTeX 4.2 distribution.
+%%   Version 4.2a of REVTeX, January, 2015
+%%
+%%
+%%   Copyright (c) 2015 The American Physical Society.
+%%
+%%   See the REVTeX 4 README file for restrictions and more information.
+%%
+%
+% This is a template for producing manuscripts for use with REVTEX 4.2
+% Copy this file to another name and then work on that file.
+% That way, you always have this original template file to use.
+%
+% Group addresses by affiliation; use superscriptaddress for long
+% author lists, or if there are many overlapping affiliations.
+% For Phys. Rev. appearance, change preprint to twocolumn.
+% Choose pra, prb, prc, prd, pre, prl, prstab, prstper, or rmp for journal
+%  Add 'draft' option to mark overfull boxes with black boxes
+%  Add 'showkeys' option to make keywords appear
+%\documentclass[aps,prl,preprint,groupedaddress]{revtex4-2}
+\documentclass[aps,prl,twocolumn,groupedaddress]{revtex4-2}
+%\documentclass[aps,prl,preprint,superscriptaddress]{revtex4-2}
+%\documentclass[aps,prl,reprint,groupedaddress]{revtex4-2}
+
+% You should use BibTeX and apsrev.bst for references
+% Choosing a journal automatically selects the correct APS
+% BibTeX style file (bst file), so only uncomment the line
+% below if necessary.
+%\bibliographystyle{apsrev4-2}
+
+\usepackage{graphicx}
+\usepackage{epstopdf}
+%\usepackage{amsmath}% http://ctan.org/pkg/amsmath
+%\usepackage{amsthm}
+%\usepackage{amsfonts}
+%\usepackage{subfigure}
+%\usepackage{hhline}
+%\usepackage[miktex]{gnuplottex}
+%\usepackage{xcolor}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{color}
+\usepackage{hyperref}
+%\usepackage[percent]{overpic}
+\usepackage{tikz}
+\usepackage{mathrsfs}
+\usepackage{wasysym}
+\usepackage{tikz-cd}
+%\usepackage{stix} %\fisheye
+\usepackage{stackengine,scalerel}
+\usepackage{multirow}
+
+% so sections, subsections, etc. become numerated.
+\setcounter{secnumdepth}{3}
+
+% Comandos proprios
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\avrg}[1]{\left\langle #1 \right\rangle}
+\newcommand{\nelta}{\bar{\delta}}
+\newcommand{\bra}[1]{\left\langle #1\right|}
+\newcommand{\ket}[1]{\left| #1 \right\rangle}
+\newcommand{\sbra}[1]{\langle #1|}
+\newcommand{\sket}[1]{| #1 \rangle}
+\newcommand{\bek}[3]{\left\langle #1 \right| #2 \left| #3 \right\rangle}
+\newcommand{\sbek}[3]{\langle #1 | #2 | #3 \rangle}
+\newcommand{\braket}[2]{\left\langle #1 \middle| #2 \right\rangle}
+\newcommand{\ketbra}[2]{\left| #1 \middle\rangle \middle\langle #2  \right|}
+\newcommand{\sbraket}[2]{\langle #1 | #2 \rangle}
+\newcommand{\sketbra}[2]{| #1 \rangle  \langle #2 |}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\snorm}[1]{\lVert#1\rVert}
+\newcommand{\bvec}[1]{\boldsymbol{\mathsf{#1}}}
+\newcommand{\bcov}[1]{\boldsymbol{#1}}
+\newcommand{\bdua}[1]{\boldsymbol{\check{#1}}}
+%\newcommand{\bdov}[1]{\boldsymbol{\breve{#1}}}
+\newcommand{\bdov}[1]{\breve{#1}}
+%\newcommand{\bten}[1]{\boldsymbol{\mathfrak{#1}}}
+\newcommand{\bten}[1]{\boldsymbol{\mathfrak{#1}}}
+\newcommand{\forany}{\tilde{\forall}}
+\newcommand{\qed}{$\overset{\circ}{.}\;$}
+
+\newcommand\bigeye{\ensurestackMath{\stackinset{c}{}{c}{-.3pt}%
+  {\bullet}{\scriptstyle\bigcirc}}}
+\newcommand\eye{\scalerel*{\bigeye}{x}}
+%\newcommand*{\fisheye}{%
+%    \mathbin{%
+%        \ooalign{$\circledcirc$\cr\hidewidth$\bullet$\hidewidth}%
+%    }%
+%}
+\renewcommand{\appendixname}{Apéndice} % Change "Appendix" to "Apéndice"
+
+\begin{document}
+
+% Use the \preprint command to place your local institutional report
+% number in the upper righthand corner of the title page in preprint mode.
+% Multiple \preprint commands are allowed.
+% Use the 'preprintnumbers' class option to override journal defaults
+% to display numbers if necessary
+%\preprint{}
+
+%Title of paper
+\title{
+Restauración de imágenes con MAXIM y Mixture of Experts
+}
+
+% repeat the \author .. \affiliation  etc. as needed
+% \email, \thanks, \homepage, \altaffiliation all apply to the current
+% author. Explanatory text should go in the []'s, actual e-mail
+% address or url should go in the {}'s for \email and \homepage.
+% Please use the appropriate macro foreach each type of information
+
+% \affiliation command applies to all authors since the last
+% \affiliation command. The \affiliation command should follow the
+% other information
+% \affiliation can be followed by \email, \homepage, \thanks as well.
+\author{Matías Ariel Murat}
+% \email[]{matias.murat@mi.unc.edu.ar}
+\affiliation{Facultad de Matem\'atica, Astronom\'ia, F\'isica y Computaci\'on, Universidad Nacional de C\'ordoba, Ciudad Universitaria, 5000 C\'ordoba, Argentina}
+
+%Collaboration name if desired (requires use of superscriptaddress
+%option in \documentclass). \noaffiliation is required (may also be
+%used with the \author command).
+%\collaboration can be followed by \email, \homepage, \thanks as well.
+%\collaboration{Juan Perez}
+%\noaffiliation
+
+% \date{\today}
+
+\begin{abstract}
+Este trabajo aborda el problema de restauración de imágenes mediante una variante de MAXIM (Multi-Axis MLP) enriquecida con un esquema de Mixture of Experts (MoE). La propuesta combina un backbone MAXIM compartido para extracción de características globales con un mecanismo de ruteo que selecciona dinámicamente cabezas expertas de reconstrucción. Esta decisión busca incorporar especialización sin duplicar el costo de las etapas profundas del modelo. Se presenta el marco teórico, el diseño metodológico y el protocolo experimental adoptado para evaluar la propuesta. Al momento de esta versión, los entrenamientos principales continúan en ejecución; por ese motivo, el manuscrito deja estructuradas las secciones de resultados, discusión y conclusiones para su completado con evidencia empírica final.
+\end{abstract}
+
+% insert suggested keywords - APS authors don't need to do this
+%\keywords{}
+
+%\maketitle must follow title, authors, abstract, and keywords
+\maketitle
+
+\section{Introducción}
+
+La restauración de imágenes es un problema central en visión por computadora de bajo nivel. En la práctica, las imágenes pueden verse degradadas por ruido, desenfoque, baja iluminación u otros factores, y cada tipo de degradación suele requerir estrategias de reconstrucción con sesgos diferentes. En este contexto, un único camino de procesamiento puede resultar limitado cuando se busca robustez frente a distribuciones heterogéneas.
+
+MAXIM constituye una alternativa relevante dentro de las arquitecturas recientes para restauración de imágenes, ya que combina operaciones locales y globales con un diseño completamente convolucional. Sin embargo, en su formulación estándar, el modelo mantiene un flujo de cómputo uniforme para todas las entradas. Esta característica simplifica el diseño, pero reduce su capacidad de especialización frente a escenarios diversos.
+
+Para abordar ese punto, en este trabajo se propone integrar el paradigma Mixture of Experts (MoE) sobre MAXIM. La idea principal es mantener un backbone compartido para preservar eficiencia y, sobre la representación latente obtenida, aplicar un mecanismo de ruteo que asigne cada entrada a expertos de salida especializados.
+
+Los objetivos de este trabajo son:
+\begin{itemize}
+    \item Diseñar una variante MAXIM+MoE compatible con restricciones de memoria y entrenamiento.
+    \item Definir un protocolo experimental claro para evaluar calidad de reconstrucción y costo computacional.
+    \item Analizar, mediante resultados cuantitativos y cualitativos, en qué medida la especialización por expertos aporta frente a una versión sin MoE.
+\end{itemize}
+
+La organización del documento es la siguiente. En la Sección II se presentan los fundamentos teóricos. En la Sección III se detalla la metodología implementada. Las Secciones IV, V y VI quedan preparadas para reportar resultados, discusión y conclusiones una vez finalizados los entrenamientos.
+
+\section{Teoría}
+
+\subsection{MAXIM como arquitectura base}
+
+MAXIM (Multi-Axis MLP) es una arquitectura orientada a tareas de restauración de imágenes. Su diseño general sigue una estructura tipo U, donde las conexiones skip permiten combinar información de bajo y alto nivel. A diferencia de enfoques puramente convolucionales, MAXIM incorpora bloques MLP con mecanismos de compuerta que capturan interacciones de largo alcance.
+
+Una propiedad importante de esta arquitectura es que mantiene una naturaleza completamente convolucional en el flujo de entrada y salida. Esto permite procesar imágenes de tamaño variable sin rediseñar el modelo para cada resolución. Además, su combinación de operaciones locales y globales ofrece un compromiso útil entre detalle fino y contexto global.
+
+\subsection{Paradigma Mixture of Experts}
+
+Mixture of Experts (MoE) es un paradigma de modelado en el cual varios submódulos especialistas (expertos) colaboran bajo un mecanismo de ruteo. El ruteador recibe una representación de la entrada y estima qué experto, o conjunto reducido de expertos, es más apropiado para producir la salida.
+
+La motivación principal de MoE es aumentar la capacidad de representación sin activar todos los parámetros para cada muestra. De este modo, el sistema puede adaptarse mejor a datos heterogéneos, manteniendo controlado el costo computacional efectivo por inferencia.
+
+\subsection{Integración MAXIM+MoE propuesta}
+
+En este trabajo no se replica el backbone completo de MAXIM para cada experto. En cambio, se usa un único extractor compartido de características profundas y se aplica la especialización en la etapa de reconstrucción final. En términos conceptuales, dado un mapa de características $f_\theta(x)$, la salida se modela como:
+\begin{equation}
+\hat{y} = \sum_{k=1}^{K} p_k(x)\, E_k(f_\theta(x)),
+\end{equation}
+donde $E_k$ representa al experto $k$ y $p_k(x)$ es el peso asignado por el ruteador para la entrada $x$.
+
+Esta formulación habilita un gradiente de especialización entre expertos sin multiplicar el costo de las capas profundas de MAXIM. La decisión responde a una restricción práctica del proyecto: la replicación completa de bloques globales incrementa fuertemente el consumo de memoria y dificulta el entrenamiento estable con recursos limitados.
+
+\subsection{Consideraciones de entrenamiento}
+
+La integración de MoE introduce desafíos específicos, en particular el riesgo de colapso hacia un único experto y la inestabilidad del ruteo durante las primeras etapas de entrenamiento. Por ese motivo, el protocolo metodológico debe contemplar criterios de balance entre expertos y monitoreo explícito de su utilización.
+
+Con este marco teórico, la siguiente sección describe el diseño experimental adoptado para implementar y evaluar la variante MAXIM+MoE.
+
+\section{Metodología}
+
+\subsection{Diseño del modelo}
+
+La arquitectura implementada se compone de tres partes:
+\begin{itemize}
+    \item un backbone MAXIM compartido, encargado de extraer representaciones latentes a partir de la imagen degradada;
+    \item un módulo de ruteo, que estima la asignación de cada muestra a los expertos;
+    \item un conjunto de cabezas expertas de salida, cada una especializada en la proyección desde la representación latente hacia la imagen restaurada.
+\end{itemize}
+
+Este diseño prioriza la eficiencia de memoria y permite introducir especialización sin duplicar las etapas más costosas del modelo.
+
+\subsection{Datos y tareas}
+
+El estudio considera tareas de restauración de imágenes con degradaciones controladas y/o reales. La definición final de los datasets utilizados se completará una vez cerrada la etapa de entrenamiento:
+\begin{itemize}
+    \item Dataset principal: [COMPLETAR].
+    \item Dataset(s) de validación y prueba: [COMPLETAR].
+    \item Tipo(s) de degradación evaluados: [COMPLETAR].
+\end{itemize}
+
+\subsection{Protocolo de entrenamiento}
+
+El entrenamiento se organiza en fases para estabilizar la interacción entre backbone, ruteador y expertos:
+\begin{enumerate}
+    \item inicialización del modelo y definición de pérdidas;
+    \item ajuste conjunto de backbone y expertos;
+    \item monitoreo del balance de uso por experto y ajuste de hiperparámetros de ruteo;
+    \item selección del mejor checkpoint según métrica de validación.
+\end{enumerate}
+
+Los valores concretos se incorporarán al finalizar las corridas:
+\begin{itemize}
+    \item optimizador y tasa de aprendizaje: [COMPLETAR];
+    \item tamaño de batch y cantidad de épocas: [COMPLETAR];
+    \item número de expertos $K$: [COMPLETAR];
+    \item criterio de ruteo (top-1, top-2 u otro): [COMPLETAR].
+\end{itemize}
+
+\subsection{Métricas de evaluación}
+
+Para cuantificar la calidad de restauración se reportarán métricas estándar de fidelidad perceptual y distorsión de reconstrucción:
+\begin{itemize}
+    \item PSNR: [COMPLETAR SI APLICA];
+    \item SSIM: [COMPLETAR SI APLICA];
+    \item métrica perceptual adicional (por ejemplo LPIPS): [COMPLETAR SI APLICA].
+\end{itemize}
+
+Además, se incluirán métricas operativas para analizar la eficiencia del enfoque:
+\begin{itemize}
+    \item tiempo de entrenamiento e inferencia;
+    \item memoria máxima utilizada;
+    \item distribución de uso de expertos por tipo de entrada.
+\end{itemize}
+
+\subsection{Implementación y recursos}
+
+La implementación se realiza en Python, empleando el ecosistema JAX/Flax para aprovechar compilación JIT y diferenciación automática. En la versión final de la tesis se detallarán:
+\begin{itemize}
+    \item hardware utilizado (GPU/CPU, memoria disponible): [COMPLETAR];
+    \item versión de librerías principales: [COMPLETAR];
+    \item tiempo total de entrenamiento por configuración: [COMPLETAR].
+\end{itemize}
+
+\section{Resultados}
+
+Esta sección se deja preparada para incorporar los resultados finales una vez concluidos los entrenamientos en curso.
+
+\subsection{Configuración experimental final}
+
+Se documentará la configuración exacta con la que se reportan resultados:
+\begin{itemize}
+    \item arquitectura final del backbone y de los expertos;
+    \item hiperparámetros seleccionados;
+    \item criterio de selección de checkpoints.
+\end{itemize}
+
+\subsection{Resultados cuantitativos}
+
+Se incluirá una tabla comparativa entre la propuesta MAXIM+MoE y los baselines definidos en la metodología.
+
+\begin{table}[ht]
+\caption{Comparación cuantitativa en el conjunto de prueba.}
+\begin{ruledtabular}
+\begin{tabular}{lccc}
+Modelo & PSNR & SSIM & Costo (ms/im) \\
+\hline
+MAXIM base & [ ] & [ ] & [ ] \\
+MAXIM+MoE (propuesto) & [ ] & [ ] & [ ] \\
+\end{tabular}
+\end{ruledtabular}
+\end{table}
+
+\subsection{Resultados cualitativos}
+
+Se agregarán ejemplos visuales representativos de reconstrucción para comparar calidad perceptual, artefactos residuales y comportamiento en casos difíciles.
+
+\subsection{Ablations}
+
+Se analizará el impacto de decisiones de diseño:
+\begin{itemize}
+    \item número de expertos;
+    \item estrategia de ruteo;
+    \item variantes de pérdida;
+    \item comparación con versión sin MoE.
+\end{itemize}
+
+\subsection{Análisis de especialización}
+
+Se estudiará la distribución de asignaciones del ruteador para verificar si emergen patrones de especialización asociados a tipos de degradación o características de la escena.
+
+\section{Discusión}
+
+Esta sección se completará con base en los resultados finales y deberá responder, al menos, los siguientes puntos:
+\begin{itemize}
+    \item en qué escenarios MAXIM+MoE mejora de manera consistente;
+    \item cuál es el costo computacional de la especialización;
+    \item qué limitaciones se observan en estabilidad, generalización o balance entre expertos;
+    \item qué decisiones metodológicas tuvieron mayor impacto en el desempeño.
+\end{itemize}
+
+\section{Conclusiones}
+
+El cierre final se redactará una vez consolidados los resultados. La versión definitiva debe incluir:
+\begin{itemize}
+    \item síntesis de aportes concretos del trabajo;
+    \item principales hallazgos experimentales;
+    \item límites del enfoque implementado;
+    \item líneas de trabajo futuro.
+\end{itemize}
+
+Como guía de redacción final:
+\begin{enumerate}
+    \item retomar el objetivo general planteado en la Introducción;
+    \item conectar ese objetivo con evidencia concreta de la Sección IV;
+    \item cerrar con una valoración realista del alcance del modelo.
+\end{enumerate}
+
+\section{Trabajo futuro}
+
+En esta sección se desarrollarán propuestas específicas para una siguiente iteración del proyecto, por ejemplo:
+\begin{itemize}
+    \item incorporar expertos en etapas internas del backbone;
+    \item evaluar ruteo jerárquico o condicional más fino;
+    \item extender la evaluación a nuevas tareas de restauración;
+    \item estudiar transferencia entre dominios.
+\end{itemize}
+
+%\section{Aknowledgments}
+\section{Agradecimientos}
+
+\begin{acknowledgments}
+MAM agradece a la UNC, en especial a los profesores Juan Ignacio Perotti, Francisco Tamarit y Benjamín Marcolongo
+por su esfuerzo y paciencia para dictar el curso de \textit{Redes Neuronales}.
+\end{acknowledgments}
+% Create the reference section using BibTeX:
+\bibliography{ref}
+
+\end{document}
+%
+% ****** End of file apstemplate.tex ******
