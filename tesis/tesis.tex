@@ -165,6 +165,9 @@ MAXIM (Multi-Axis MLP) es una arquitectura orientada a tareas de restauración d
 
 Una propiedad importante de esta arquitectura es que mantiene una naturaleza completamente convolucional en el flujo de entrada y salida. Esto permite procesar imágenes de tamaño variable sin rediseñar el modelo para cada resolución. Además, su combinación de operaciones locales y globales ofrece un compromiso útil entre detalle fino y contexto global.
 
+MAXIM esta implementado usando FLAX, una librería python de redes neuronales, construida sobre JAX, una librería de computación numérica de alto performance. FLAX/JAX permiten usar diferenciación automática o algorítmica, mas eficiente que los métodos clásicos de diferenciación numérica o simbólica. Otra ventaja de JAX es que permite la compilación JIT(just-in-time), una técnica que combina interpretación y compilación. Consiste en compilar y optimizar dinámicamente los métodos más usados durante la ejecución, combinando ventajas como la velocidad del código compilado y la flexibilidad del interpretado.
+
+
 \subsection{Paradigma Mixture of Experts}
 
 Mixture of Experts (MoE) es un paradigma de modelado en el cual varios submódulos especialistas (expertos) colaboran bajo un mecanismo de ruteo. El ruteador recibe una representación de la entrada y estima qué experto, o conjunto reducido de expertos, es más apropiado para producir la salida.
