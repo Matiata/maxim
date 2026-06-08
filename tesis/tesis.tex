@@ -163,9 +163,13 @@ La organización del documento es la siguiente. En la Sección II se presentan l
 
 MAXIM (Multi-Axis MLP) es una arquitectura orientada a tareas de restauración de imágenes. Su diseño general sigue una estructura tipo U, donde las conexiones skip permiten combinar información de bajo y alto nivel. A diferencia de enfoques puramente convolucionales, MAXIM incorpora bloques MLP con mecanismos de compuerta que capturan interacciones de largo alcance.
 
-Una propiedad importante de esta arquitectura es que mantiene una naturaleza completamente convolucional en el flujo de entrada y salida. Esto permite procesar imágenes de tamaño variable sin rediseñar el modelo para cada resolución. Además, su combinación de operaciones locales y globales ofrece un compromiso útil entre detalle fino y contexto global.
+La arquitectura se apoya principalmente en dos módulos. El primero es el bloque \textit{multi-axis gated MLP}, que permite modelar interacciones locales y globales entre elementos visuales a través de compuertas aplicadas sobre distintos ejes de la representación. El segundo es el bloque de compuertas cruzadas, propuesto como una alternativa basada en MLP a mecanismos de atención cruzada. En conjunto, estos módulos permiten incorporar contexto global sin abandonar una estructura eficiente para el procesamiento de imágenes.
 
-MAXIM esta implementado usando FLAX, una librería python de redes neuronales, construida sobre JAX, una librería de computación numérica de alto performance. FLAX/JAX permiten usar diferenciación automática o algorítmica, mas eficiente que los métodos clásicos de diferenciación numérica o simbólica. Otra ventaja de JAX es que permite la compilación JIT(just-in-time), una técnica que combina interpretación y compilación. Consiste en compilar y optimizar dinámicamente los métodos más usados durante la ejecución, combinando ventajas como la velocidad del código compilado y la flexibilidad del interpretado.
+Una propiedad importante de esta arquitectura es que mantiene una naturaleza completamente convolucional en el flujo de entrada y salida. Esto permite procesar imágenes de tamaño variable sin rediseñar el modelo para cada resolución. Además, MAXIM expresa campos receptivos globales sobre imágenes arbitrariamente grandes con un costo que escala linealmente con el tamaño de la entrada, evitando el crecimiento cuadrático típico de mecanismos de atención global directa.
+
+El diseño también integra varias ideas frecuentes en visión de bajo nivel, como aprendizaje residual, conexiones densas, estructuras jerárquicas, procesamiento en múltiples etapas y mecanismos de atención o compuerta. Su combinación de bloques locales convolucionales y bloques globales basados en MLP logran un balance útil entre preservación de detalle fino y uso de contexto amplio, logrando buen desempeño sin depender necesariamente de preentrenamiento a gran escala.
+
+MAXIM está implementado usando Flax, una librería Python de redes neuronales construida sobre JAX, una librería de computación numérica de alto rendimiento. Flax/JAX permiten usar diferenciación automática o algorítmica, más eficiente que los métodos clásicos de diferenciación numérica o simbólica. Otra ventaja de JAX es que permite la compilación JIT (\textit{just-in-time}), una técnica que combina interpretación y compilación. Consiste en compilar y optimizar dinámicamente los métodos más usados durante la ejecución, combinando ventajas como la velocidad del código compilado y la flexibilidad del interpretado.
 
 
 \subsection{Paradigma Mixture of Experts}
@@ -173,6 +177,8 @@ MAXIM esta implementado usando FLAX, una librería python de redes neuronales, c
 Mixture of Experts (MoE) es un paradigma de modelado en el cual varios submódulos especialistas (expertos) colaboran bajo un mecanismo de ruteo. El ruteador recibe una representación de la entrada y estima qué experto, o conjunto reducido de expertos, es más apropiado para producir la salida.
 
 La motivación principal de MoE es aumentar la capacidad de representación sin activar todos los parámetros para cada muestra. De este modo, el sistema puede adaptarse mejor a datos heterogéneos, manteniendo controlado el costo computacional efectivo por inferencia.
+
+En el contexto de restauración de imágenes, esta idea resulta relevante porque un único modelo puede recibir entradas afectadas por degradaciones distintas, como ruido, desenfoque, baja iluminación o compresiones con diferentes características. Un camino de cómputo compartido debe representar todos esos casos con los mismos parámetros activos, mientras que un esquema MoE permite dividir implícitamente el problema en subconjuntos y asignar expertos a patrones de degradación o regiones del espacio de datos.
 
 \subsection{Integración MAXIM+MoE propuesta}
 
@@ -183,6 +189,10 @@ En este trabajo no se replica el backbone completo de MAXIM para cada experto. E
 donde $E_k$ representa al experto $k$ y $p_k(x)$ es el peso asignado por el ruteador para la entrada $x$.
 
 Esta formulación habilita un gradiente de especialización entre expertos sin multiplicar el costo de las capas profundas de MAXIM. La decisión responde a una restricción práctica del proyecto: la replicación completa de bloques globales incrementa fuertemente el consumo de memoria y dificulta el entrenamiento estable con recursos limitados.
+
+En este esquema, los expertos no procesan directamente la imagen degradada ni intervienen en las primeras etapas de extracción de características. Cada experto funciona como una cabeza de salida especializada que opera sobre la representación latente producida por MAXIM. Por lo tanto, el ruteador puede interpretarse como un selector de hipótesis de reconstrucción: a partir de las características globales de la entrada, pondera las salidas expertas que mejor se ajustan al caso observado.
+
+Este enfoque conserva las ventajas centrales de MAXIM, como su carácter completamente convolucional y su capacidad para operar sobre resoluciones arbitrarias, pero introduce especialización con un incremento marginal respecto del costo del backbone. La propuesta puede verse como un compromiso entre capacidad y eficiencia: la especialización ocurre en una etapa tardía, aunque sobre representaciones suficientemente ricas para capturar variaciones complejas en la reconstrucción.
 
 \subsection{Consideraciones de entrenamiento}
 
