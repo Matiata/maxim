@@ -131,7 +131,7 @@ Restauración de imágenes con MAXIM y Mixture of Experts
 % \date{\today}
 
 \begin{abstract}
-Este trabajo aborda el problema de restauración de imágenes mediante una variante de MAXIM (Multi-Axis MLP) enriquecida con un esquema de Mixture of Experts (MoE). La propuesta combina un backbone MAXIM compartido para extracción de características globales con un mecanismo de ruteo que selecciona dinámicamente cabezas expertas de reconstrucción. Esta decisión busca incorporar especialización sin duplicar el costo de las etapas profundas del modelo. Se presenta el marco teórico, el diseño metodológico y el protocolo experimental adoptado para evaluar la propuesta. Al momento de esta versión, los entrenamientos principales continúan en ejecución; por ese motivo, el manuscrito deja estructuradas las secciones de resultados, discusión y conclusiones para su completado con evidencia empírica final.
+Este trabajo aborda la restauración de imágenes mediante una variante de MAXIM (Multi-Axis MLP) con un esquema de Mixture of Experts (MoE), que combina un backbone compartido con un ruteador que pondera dinámicamente un conjunto de cabezas expertas de reconstrucción, buscando especialización sin duplicar el costo de las etapas profundas. Sobre un conjunto unificado de cinco tareas, dos versiones de MAXIM sin MoE ---mono-tarea y multi-tarea--- alcanzan $23{,}1$ y $25{,}5$~dB de PSNR de validación, mientras que la variante MAXIM+MoE se estanca en torno a $12{,}7$~dB con un ruteador que colapsa a un régimen prácticamente uniforme. Analizamos las causas ---la pérdida de la supervisión profunda multi-escala de MAXIM, la baja capacidad de los expertos y una regularización que premia el ruteo uniforme--- y derivamos líneas concretas de mejora. El resultado, negativo pero informativo, delimita las condiciones bajo las cuales la especialización tardía por expertos podría aportar valor en restauración de imágenes.
 \end{abstract}
 
 % insert suggested keywords - APS authors don't need to do this
@@ -144,18 +144,18 @@ Este trabajo aborda el problema de restauración de imágenes mediante una varia
 
 La restauración de imágenes es un problema central en visión por computadora de bajo nivel. En la práctica, las imágenes pueden verse degradadas por ruido, desenfoque, baja iluminación u otros factores, y cada tipo de degradación suele requerir estrategias de reconstrucción con sesgos diferentes. En este contexto, un único camino de procesamiento puede resultar limitado cuando se busca robustez frente a distribuciones heterogéneas.
 
-MAXIM constituye una alternativa relevante dentro de las arquitecturas recientes para restauración de imágenes, ya que combina operaciones locales y globales con un diseño completamente convolucional. Sin embargo, en su formulación estándar, el modelo mantiene un flujo de cómputo uniforme para todas las entradas. Esta característica simplifica el diseño, pero reduce su capacidad de especialización frente a escenarios diversos.
+MAXIM~\cite{tu2022maxim} constituye una alternativa relevante dentro de las arquitecturas recientes para restauración de imágenes, ya que combina operaciones locales y globales con un diseño completamente convolucional. Sin embargo, en su formulación estándar, el modelo mantiene un flujo de cómputo uniforme para todas las entradas. Esta característica simplifica el diseño, pero reduce su capacidad de especialización frente a escenarios diversos.
 
-Para abordar ese punto, en este trabajo se propone integrar el paradigma Mixture of Experts (MoE) sobre MAXIM. La idea principal es mantener un backbone compartido para preservar eficiencia y, sobre la representación latente obtenida, aplicar un mecanismo de ruteo que asigne cada entrada a expertos de salida especializados.
+Para abordar ese punto, en este trabajo se propone integrar el paradigma Mixture of Experts (MoE)~\cite{jacobs1991mixtures,shazeer2017moe} sobre MAXIM. La idea principal es mantener un backbone compartido para preservar eficiencia y, sobre la representación latente obtenida, aplicar un mecanismo de ruteo que pondere para cada entrada un conjunto de expertos de salida especializados.
 
 Los objetivos de este trabajo son:
 \begin{itemize}
     \item Diseñar una variante MAXIM+MoE compatible con restricciones de memoria y entrenamiento.
     \item Definir un protocolo experimental claro para evaluar calidad de reconstrucción y costo computacional.
-    \item Analizar, mediante resultados cuantitativos y cualitativos, en qué medida la especialización por expertos aporta frente a una versión sin MoE.
+    \item Analizar, mediante resultados cuantitativos y el diagnóstico del ruteador, en qué medida la especialización por expertos aporta frente a una versión sin MoE.
 \end{itemize}
 
-La organización del documento es la siguiente. En la Sección II se presentan los fundamentos teóricos. En la Sección III se detalla la metodología implementada. Las Secciones IV, V y VI quedan preparadas para reportar resultados, discusión y conclusiones una vez finalizados los entrenamientos.
+La organización del documento es la siguiente. En la Sección~II se presentan los fundamentos teóricos de MAXIM y de MoE. En la Sección~III se detalla la metodología implementada: arquitectura, datos, protocolo de entrenamiento y métricas. La Sección~IV reporta los resultados cuantitativos de las tres configuraciones entrenadas y el análisis del ruteador. Las Secciones~V y~VI discuten los hallazgos y presentan las conclusiones, y la Sección~VII delinea el trabajo futuro.
 
 \section{Teoría}
 
@@ -178,6 +178,8 @@ Mixture of Experts (MoE) es un paradigma de modelado en el cual varios submódul
 
 La motivación principal de MoE es aumentar la capacidad de representación sin activar todos los parámetros para cada muestra. De este modo, el sistema puede adaptarse mejor a datos heterogéneos, manteniendo controlado el costo computacional efectivo por inferencia.
 
+El ruteo admite distintas variantes. En el ruteo \textit{disperso} (\textit{sparse}) se selecciona únicamente el experto de mayor peso (top-1) o los dos de mayor peso (top-2), de modo que solo una fracción de los expertos se evalúa por muestra~\cite{shazeer2017moe,fedus2022switch}. En el ruteo \textit{denso} o \textit{suave}, en cambio, todos los expertos se evalúan y la salida es una combinación convexa de sus predicciones, ponderada por una distribución \textit{softmax} sobre los pesos de compuerta. La variante densa es más simple y diferenciable de extremo a extremo, pero no reduce el cómputo y, como se verá, es más propensa a soluciones de ruteo poco discriminativas.
+
 En el contexto de restauración de imágenes, esta idea resulta relevante porque un único modelo puede recibir entradas afectadas por degradaciones distintas, como ruido, desenfoque, baja iluminación o compresiones con diferentes características. Un camino de cómputo compartido debe representar todos esos casos con los mismos parámetros activos, mientras que un esquema MoE permite dividir implícitamente el problema en subconjuntos y asignar expertos a patrones de degradación o regiones del espacio de datos.
 
 \subsection{Integración MAXIM+MoE propuesta}
@@ -196,9 +198,9 @@ Este enfoque conserva las ventajas centrales de MAXIM, como su carácter complet
 
 \subsection{Consideraciones de entrenamiento}
 
-La integración de MoE introduce desafíos específicos, en particular el riesgo de colapso hacia un único experto y la inestabilidad del ruteo durante las primeras etapas de entrenamiento. Por ese motivo, el protocolo metodológico debe contemplar criterios de balance entre expertos y monitoreo explícito de su utilización.
+La integración de MoE introduce desafíos específicos. El más conocido es el \textit{colapso del ruteador}: el sistema puede converger a usar siempre el mismo experto, o bien al extremo opuesto, repartir la carga de forma idéntica entre todos los expertos sin diferenciarlos. Para mitigar el primer caso es habitual añadir un término de \textit{balance de carga} que penaliza distribuciones de uso muy desiguales~\cite{shazeer2017moe,fedus2022switch}, y un término de \textit{entropía} que regula cuán concentrada o dispersa es la distribución de compuerta. Estos términos deben calibrarse con cuidado: una regularización demasiado fuerte hacia el balance empuja precisamente hacia el segundo modo de colapso, en el que el ruteo se vuelve uniforme y deja de aportar especialización.
 
-Con este marco teórico, la siguiente sección describe el diseño experimental adoptado para implementar y evaluar la variante MAXIM+MoE.
+Por ese motivo, el protocolo metodológico contempla estos criterios de balance y un monitoreo explícito de la utilización por experto. Con este marco teórico, la siguiente sección describe el diseño experimental adoptado para implementar y evaluar la variante MAXIM+MoE.
 
 \section{Metodología}
 
@@ -207,146 +209,142 @@ Con este marco teórico, la siguiente sección describe el diseño experimental 
 La arquitectura implementada se compone de tres partes:
 \begin{itemize}
     \item un backbone MAXIM compartido, encargado de extraer representaciones latentes a partir de la imagen degradada;
-    \item un módulo de ruteo, que estima la asignación de cada muestra a los expertos;
-    \item un conjunto de cabezas expertas de salida, cada una especializada en la proyección desde la representación latente hacia la imagen restaurada.
+    \item un módulo de ruteo, que a partir de la imagen de entrada estima una distribución de pesos sobre los expertos;
+    \item un conjunto de $K$ cabezas expertas de salida, cada una encargada de la proyección desde la representación latente hacia la imagen restaurada.
 \end{itemize}
 
-Este diseño prioriza la eficiencia de memoria y permite introducir especialización sin duplicar las etapas más costosas del modelo.
+Concretamente, el backbone produce el mapa de características de la última etapa del decodificador a resolución completa, $f_\theta(x)$. El ruteador es una red liviana independiente ---un pequeño backbone de convoluciones separables en profundidad seguido de un perceptrón multicapa--- que emite $K$ logits; sobre ellos se aplica \textit{softmax} con una temperatura de $1{,}5$ durante el entrenamiento y de $1{,}0$ en evaluación. Cada experto $E_k$ es una única convolución $3\times 3$ que mapea $f_\theta(x)$ a tres canales RGB. La salida es la combinación convexa de las cabezas (ruteo denso), a la que se suma la entrada como conexión residual,
+\begin{equation}
+\hat{y} = x + \sum_{k=1}^{K} p_k(x)\, E_k\big(f_\theta(x)\big).
+\end{equation}
+Se utilizan $K=5$ expertos, en correspondencia nominal con las cinco tareas consideradas. Este diseño prioriza la eficiencia de memoria: los expertos añaden una cantidad de parámetros despreciable frente al backbone, de modo que la especialización se introduce sin duplicar las etapas más costosas del modelo.
 
 \subsection{Datos y tareas}
 
-El estudio considera tareas de restauración de imágenes con degradaciones controladas y/o reales. La definición final de los datasets utilizados se completará una vez cerrada la etapa de entrenamiento:
-\begin{itemize}
-    \item Dataset principal: [COMPLETAR].
-    \item Dataset(s) de validación y prueba: [COMPLETAR].
-    \item Tipo(s) de degradación evaluados: [COMPLETAR].
-\end{itemize}
+El estudio se realiza sobre un conjunto unificado de cinco tareas de restauración: \textit{deblurring} (eliminación de desenfoque), \textit{dehazing} (eliminación de neblina), \textit{denoising} (eliminación de ruido), \textit{deraining} (eliminación de lluvia) y \textit{enhancement} (realce de imágenes en baja iluminación). Cada tarea se organiza en una carpeta con pares de imagen degradada y objetivo (\textit{ground truth}), tomados de \textit{benchmarks} estándar de restauración; en particular, las tareas de \textit{deblurring} y \textit{enhancement} se asocian a GoPro~\cite{nah2017gopro} y LOL~\cite{wei2018lol}, que son además los conjuntos de los \textit{checkpoints} preentrenados de MAXIM empleados como punto de partida. Las tareas de \textit{denoising}, \textit{dehazing} y \textit{deraining} se representan con conjuntos de la misma familia de \textit{benchmarks}~\cite{abdelhamed2018sidd,li2019reside,fu2017derain}.
+
+Durante el entrenamiento, las muestras se extraen de las cinco tareas con un esquema de muestreo \emph{uniforme} (cada tarea contribuye en igual proporción por época). En validación se emplea un muestreo \emph{proporcional} al tamaño de cada conjunto. Tanto en entrenamiento como en validación se opera sobre parches de $256\times 256$ píxeles ---extraídos de forma aleatoria--- con normalización al rango $[0,1]$; en entrenamiento se aplican además aumentos de datos por reflejos y rotaciones de $90^\circ$. La restricción a parches en validación responde a limitaciones de memoria del entorno de cómputo.
 
 \subsection{Protocolo de entrenamiento}
 
-El entrenamiento se organiza en fases para estabilizar la interacción entre backbone, ruteador y expertos:
-\begin{enumerate}
-    \item inicialización del modelo y definición de pérdidas;
-    \item ajuste conjunto de backbone y expertos;
-    \item monitoreo del balance de uso por experto y ajuste de hiperparámetros de ruteo;
-    \item selección del mejor checkpoint según métrica de validación.
-\end{enumerate}
-
-Los valores concretos se incorporarán al finalizar las corridas:
+Se entrenaron tres configuraciones que comparten infraestructura, hiperparámetros base y definición de las métricas. Las dos que operan sobre la mezcla completa ---MAXIM multi-tarea y MAXIM+MoE--- comparten exactamente el mismo conjunto de validación, por lo que son directamente comparables; la versión mono-tarea se valida sobre una sola tarea y se incluye como punto de referencia adicional:
 \begin{itemize}
-    \item optimizador y tasa de aprendizaje: [COMPLETAR];
-    \item tamaño de batch y cantidad de épocas: [COMPLETAR];
-    \item número de expertos $K$: [COMPLETAR];
-    \item criterio de ruteo (top-1, top-2 u otro): [COMPLETAR].
+    \item \textbf{MAXIM mono-tarea}: el modelo base (variante S-2), sin MoE, entrenado desde inicialización aleatoria sobre una única tarea de restauración (realce);
+    \item \textbf{MAXIM multi-tarea}: el modelo base (variante S-3), sin MoE, entrenado sobre la mezcla de las cinco tareas e inicializado desde un \textit{checkpoint} preentrenado de MAXIM (Enhancement/LOL);
+    \item \textbf{MAXIM+MoE}: la variante propuesta, cuyo backbone es la variante S-2, entrenada sobre la misma mezcla de cinco tareas pero desde inicialización aleatoria.
 \end{itemize}
+
+Las variantes S-2 y S-3 de MAXIM se diferencian en el número de etapas de procesamiento (dos y tres, respectivamente): a mayor número de etapas, mayor capacidad del modelo y más puntos de supervisión. Conviene notar que la variante MoE comparte tanto la escala (S-2) como la inicialización aleatoria con la línea base mono-tarea, lo que permite aislar el efecto del esquema de expertos y de la supervisión de una sola escala.
+
+La función de pérdida del modelo base es un error absoluto medio (L1) con \emph{supervisión profunda}: se evalúa en las salidas de todas las etapas y escalas de MAXIM, con un peso $0{,}5^{\,(S-1-i)}$ para la escala $i$ de un total de $S=3$ escalas de supervisión. En la variante MoE, en cambio, el camino de cómputo produce una única salida a resolución completa, por lo que la pérdida de reconstrucción es un L1 de una sola escala. A esta se suma la regularización del ruteador,
+\begin{equation}
+\mathcal{L} = \mathcal{L}_{\text{L1}}
+  \;-\; \lambda_{\mathrm{ent}}\, \mathcal{H}(p)
+  \;+\; \lambda_{\mathrm{bal}}\, \mathcal{B}(p),
+\end{equation}
+donde $\mathcal{H}(p)$ es la entropía media de la distribución de compuerta, $\mathcal{B}(p)=K\sum_k \bar{p}_k^{\,2}$ es el término de balance de carga (mínimo, igual a $1$, cuando el uso medio $\bar{p}_k$ es uniforme), $\lambda_{\mathrm{ent}}=10^{-3}$ y $\lambda_{\mathrm{bal}}=10^{-2}$.
+
+En todas las configuraciones se utilizó el optimizador AdamW~\cite{loshchilov2019adamw} con tasa de aprendizaje base $2\times 10^{-4}$, \textit{weight decay} $10^{-4}$, recorte de gradiente por norma global a $1{,}0$, un calentamiento (\textit{warmup}) lineal de $3$ épocas y posterior decaimiento por coseno. El tamaño de \textit{batch} fue de $2$ y cada época abarcó $2000$ pasos. Todas las configuraciones se entrenaron con un presupuesto de $30$ épocas, fijado para mantener una comparación justa entre modelos; la variante MoE se monitoreó además hasta más de $60$ épocas, lo que permitió verificar que su estancamiento no se debía a un presupuesto insuficiente. Se conservó el \textit{checkpoint} con mejor PSNR de validación.
 
 \subsection{Métricas de evaluación}
 
-Para cuantificar la calidad de restauración se reportarán métricas estándar de fidelidad perceptual y distorsión de reconstrucción:
-\begin{itemize}
-    \item PSNR: [COMPLETAR SI APLICA];
-    \item SSIM: [COMPLETAR SI APLICA];
-    \item métrica perceptual adicional (por ejemplo LPIPS): [COMPLETAR SI APLICA].
-\end{itemize}
-
-Además, se incluirán métricas operativas para analizar la eficiencia del enfoque:
-\begin{itemize}
-    \item tiempo de entrenamiento e inferencia;
-    \item memoria máxima utilizada;
-    \item distribución de uso de expertos por tipo de entrada.
-\end{itemize}
+La calidad de reconstrucción se cuantifica con la \emph{PSNR} (\textit{Peak Signal-to-Noise Ratio}) sobre el conjunto de validación, calculada de manera idéntica en las tres configuraciones a partir del error cuadrático medio en escala $[0,255]$,
+\begin{equation}
+\mathrm{PSNR} = 20\,\log_{10}\!\left(\frac{255}{\sqrt{\mathrm{MSE}}}\right).
+\end{equation}
+Como métrica perceptual complementaria se reporta la \emph{SSIM} (\textit{Structural Similarity Index})~\cite{wang2004ssim}, que evalúa la similitud estructural local entre la reconstrucción y la referencia y resulta más sensible que la PSNR a la calidad percibida; se incluye además la pérdida L1 de validación como medida de fidelidad. Una métrica perceptual basada en redes, como LPIPS~\cite{zhang2018lpips}, podría incorporarse en un análisis posterior. Para la variante MoE se monitorean, adicionalmente, métricas específicas del ruteador: la entropía de la distribución de compuerta, el término de balance de carga y el uso medio por experto, que permiten diagnosticar la aparición de colapso del ruteo. El análisis se complementa con una inspección cualitativa de reconstrucciones representativas.
 
 \subsection{Implementación y recursos}
 
-La implementación se realiza en Python, empleando el ecosistema JAX/Flax para aprovechar compilación JIT y diferenciación automática. En la versión final de la tesis se detallarán:
-\begin{itemize}
-    \item hardware utilizado (GPU/CPU, memoria disponible): [COMPLETAR];
-    \item versión de librerías principales: [COMPLETAR];
-    \item tiempo total de entrenamiento por configuración: [COMPLETAR].
-\end{itemize}
+La implementación se realiza en Python sobre el ecosistema JAX/Flax~\cite{jax2018,flax2023}, aprovechando la compilación JIT y la diferenciación automática. Para acotar el consumo de memoria en la variante MoE se recurrió al \textit{gradient checkpointing} (recomputación de activaciones en el paso hacia atrás), lo que permitió entrenar con el \textit{batch} reducido indicado. Los entrenamientos se ejecutaron en una única GPU en un entorno de tipo Colab; esta restricción de memoria es la que motiva tanto el tamaño de \textit{batch} de $2$ como el diseño de expertos de salida en lugar de la replicación de bloques internos del backbone.
 
 \section{Resultados}
 
-Esta sección se deja preparada para incorporar los resultados finales una vez concluidos los entrenamientos en curso.
-
-\subsection{Configuración experimental final}
-
-Se documentará la configuración exacta con la que se reportan resultados:
-\begin{itemize}
-    \item arquitectura final del backbone y de los expertos;
-    \item hiperparámetros seleccionados;
-    \item criterio de selección de checkpoints.
-\end{itemize}
+Se reportan los resultados de las tres configuraciones descritas en la metodología, todas entrenadas y evaluadas con el mismo protocolo. El análisis se centra en la PSNR de validación, en la dinámica de entrenamiento de la variante MoE y en el comportamiento de su ruteador.
 
 \subsection{Resultados cuantitativos}
 
-Se incluirá una tabla comparativa entre la propuesta MAXIM+MoE y los baselines definidos en la metodología.
+La Tabla~\ref{tab:cuant} resume el desempeño de las tres configuraciones, y la Fig.~\ref{fig:valpsnr} muestra la evolución de la PSNR de validación a lo largo del entrenamiento. Las dos versiones sin MoE convergen al rango esperado para MAXIM: la versión multi-tarea, beneficiada por la inicialización preentrenada, alcanza $25{,}5$~dB, mientras que la versión mono-tarea, entrenada desde cero, llega a $23{,}1$~dB con una curva más ruidosa pero claramente ascendente.
+
+La variante MAXIM+MoE presenta un comportamiento marcadamente distinto. Tras una mejora inicial muy rápida durante las primeras tres épocas ---en las que pasa de $\sim\!10{,}5$ a $\sim\!12{,}3$~dB---, la PSNR de validación se estanca y oscila en torno a $12{,}5$--$12{,}7$~dB sin progreso apreciable. El mejor \textit{checkpoint} alcanza $12{,}7$~dB, una diferencia de casi $13$~dB respecto del modelo base multi-tarea, que se evalúa sobre el mismo conjunto de validación. Prolongar el entrenamiento más allá de las $60$ épocas no modificó este estancamiento, lo que descarta que se trate de un presupuesto de cómputo insuficiente. La versión mono-tarea, aunque se evalúa sobre una sola tarea, ofrece un contraste adicional útil: entrenada también desde cero, supera los $20$~dB ya en la época~6, mientras que la variante MoE nunca despega de la franja de los $12$--$13$~dB.
 
 \begin{table}[ht]
-\caption{Comparación cuantitativa en el conjunto de prueba.}
+\caption{\label{tab:cuant}Comparación cuantitativa sobre el conjunto de validación (parches de $256\times 256$). Se reporta la mejor PSNR alcanzada, la SSIM asociada y la pérdida L1 de validación. ``Escala'' indica la variante de MAXIM (S-2 o S-3, según el número de etapas); ``Inic.'' la inicialización (aleatoria o desde \textit{checkpoint} preentrenado) y ``Sup.'' el tipo de supervisión (multi-escala o de una sola escala). Los valores de SSIM, marcados con ``---'', se obtienen ejecutando el \textit{script} de evaluación \texttt{eval\_metrics.py} sobre los \textit{checkpoints} guardados.}
 \begin{ruledtabular}
-\begin{tabular}{lccc}
-Modelo & PSNR & SSIM & Costo (ms/im) \\
+\begin{tabular}{lcccccc}
+Modelo & Escala & Inic. & Sup. & PSNR (dB) & SSIM & L1 val. \\
 \hline
-MAXIM base & [ ] & [ ] & [ ] \\
-MAXIM+MoE (propuesto) & [ ] & [ ] & [ ] \\
+MAXIM mono-tarea   & S-2 & aleat.   & multi  & $23{,}1$ & --- & $0{,}068$ \\
+MAXIM multi-tarea  & S-3 & preentr. & multi  & $\mathbf{25{,}5}$ & --- & $\mathbf{0{,}042}$ \\
+MAXIM+MoE          & S-2 & aleat.   & simple & $12{,}7$ & --- & $0{,}193$ \\
 \end{tabular}
 \end{ruledtabular}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig_val_psnr.pdf}
+\caption{\label{fig:valpsnr}Evolución de la PSNR de validación durante el entrenamiento, para un presupuesto común de $30$ épocas. Las dos versiones de MAXIM sin MoE mejoran de forma sostenida, mientras que la variante MAXIM+MoE se estanca tempranamente muy por debajo de ambas. La curva mono-tarea comienza en la época~6 por el rango disponible en el registro de entrenamiento.}
+\end{figure}
+
+\subsection{Dinámica de entrenamiento y comportamiento del ruteador}
+
+La Fig.~\ref{fig:moedyn} examina con mayor detalle la corrida de MAXIM+MoE. El panel~(a) confirma que tanto la PSNR de entrenamiento como la de validación se estabilizan rápidamente cerca de $12{,}5$--$13$~dB y permanecen allí durante toda la corrida; la pequeña oscilación periódica refleja la rotación entre las cinco tareas a lo largo de cada época. No se observa sobreajuste ---las curvas de entrenamiento y validación permanecen muy próximas---, sino un estancamiento conjunto: el modelo deja de aprender, no memoriza.
+
+El panel~(b) revela la causa central. La entropía de la distribución de compuerta asciende casi de inmediato hasta su valor máximo, $\ln K \approx 1{,}609$~nats, y allí se mantiene; en paralelo, el término de balance de carga cae a su mínimo, $1{,}0$. En conjunto, ambos indicadores describen un ruteador que reparte su peso de forma prácticamente uniforme entre los cinco expertos (un uso medio de $0{,}2$ por experto, constante a lo largo de todo el entrenamiento). Es decir, el ruteador no llega a discriminar entre tareas ni tipos de degradación: la ``mezcla de expertos'' degenera en un promedio uniforme de cinco cabezas casi idénticas, equivalente en la práctica a una única cabeza de salida lineal.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figs/fig_moe_dynamics.pdf}
+\caption{\label{fig:moedyn}Diagnóstico de la variante MAXIM+MoE a lo largo de $62$ épocas. (a)~La PSNR de entrenamiento y validación se estancan en torno a $12{,}5$--$13$~dB. (b)~La entropía del ruteador (naranja) satura en su máximo $\ln K$ (línea punteada gris) y el balance de carga (verde) cae a su mínimo $1{,}0$: el ruteo colapsa a un régimen uniforme y no especializado.}
+\end{figure*}
+
+Este patrón es coherente con la regularización empleada: tanto el premio a la entropía como la penalización del desbalance tienen su óptimo en la distribución uniforme, de modo que ambos términos empujan al ruteador hacia el mismo punto. Al no existir una señal que incentive la especialización ---por ejemplo, una supervisión explícita de la tarea sobre el ruteador--- y al ser el ruteo denso, la solución de mínimo esfuerzo consiste en igualar los pesos. El análisis de especialización por tipo de degradación, previsto inicialmente, pierde sentido en este escenario: sin asignaciones diferenciadas no emergen expertos asociados a degradaciones específicas.
+
 \subsection{Resultados cualitativos}
 
-Se agregarán ejemplos visuales representativos de reconstrucción para comparar calidad perceptual, artefactos residuales y comportamiento en casos difíciles.
+La Fig.~\ref{fig:cualit} contrasta reconstrucciones sobre muestras representativas de validación, ordenadas en columnas: la entrada degradada, la salida del modelo base multi-tarea, la de la variante MAXIM+MoE y la imagen de referencia. La comparación visual es consistente con la brecha cuantitativa de la Tabla~\ref{tab:cuant}: el modelo base recupera estructura y contraste de forma fiel, mientras que la variante MoE entrega reconstrucciones marcadamente más pobres, con pérdida de detalle fino y un aspecto suavizado. Este comportamiento es el esperable de un ruteador que promedia de manera uniforme cinco cabezas equivalentes, en lugar de seleccionar una hipótesis de reconstrucción especializada para cada entrada.
 
-\subsection{Ablations}
-
-Se analizará el impacto de decisiones de diseño:
-\begin{itemize}
-    \item número de expertos;
-    \item estrategia de ruteo;
-    \item variantes de pérdida;
-    \item comparación con versión sin MoE.
-\end{itemize}
-
-\subsection{Análisis de especialización}
-
-Se estudiará la distribución de asignaciones del ruteador para verificar si emergen patrones de especialización asociados a tipos de degradación o características de la escena.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig_qualitative.pdf}
+\caption{\label{fig:cualit}Comparación cualitativa sobre muestras de validación de distintas tareas. De izquierda a derecha: entrada degradada, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia. La figura se genera con el \textit{script} \texttt{eval\_metrics.py} a partir de los \textit{checkpoints} guardados.}
+\end{figure}
 
 \section{Discusión}
 
-Esta sección se completará con base en los resultados finales y deberá responder, al menos, los siguientes puntos:
-\begin{itemize}
-    \item en qué escenarios MAXIM+MoE mejora de manera consistente;
-    \item cuál es el costo computacional de la especialización;
-    \item qué limitaciones se observan en estabilidad, generalización o balance entre expertos;
-    \item qué decisiones metodológicas tuvieron mayor impacto en el desempeño.
-\end{itemize}
+Los resultados indican que, en la configuración evaluada, la variante MAXIM+MoE no mejora a la versión sin MoE; por el contrario, queda muy por debajo de ambas referencias. Conviene, antes que nada, separar lo que la comparación permite concluir de lo que no. La diferencia frente al modelo multi-tarea está parcialmente confundida por dos factores: la inicialización (ese modelo partió de pesos preentrenados de MAXIM, mientras que la variante MoE se entrenó desde cero) y la escala del backbone (el multi-tarea emplea la variante S-3, de mayor capacidad, frente a la S-2 del MoE). Por eso la comparación más limpia es contra la versión mono-tarea, que comparte con el MoE tanto la escala (S-2) como la inicialización aleatoria. Aun así, esa versión superó los $20$~dB en la época~6 y siguió mejorando, mientras que la variante MoE se estancó por debajo de los $13$~dB desde la época~3. La diferencia, entonces, no se explica ni por el tamaño del modelo ni por el preentrenamiento: el cuello de botella está en el propio diseño y entrenamiento de la variante MoE.
+
+El análisis del ruteador (Fig.~\ref{fig:moedyn}) apunta a un \emph{colapso hacia el ruteo uniforme}. Identificamos cuatro factores que, en conjunto, explican el comportamiento observado:
+
+\begin{enumerate}
+    \item \textbf{Regularización que premia la uniformidad.} El término de entropía (maximizado) y el de balance de carga (que es mínimo en la distribución uniforme) tienen su óptimo en el mismo punto. En ausencia de una señal que favorezca la concentración del ruteo, ambos términos arrastran al ruteador hacia pesos iguales, que es exactamente el régimen no especializado que se buscaba evitar.
+    \item \textbf{Pérdida de la supervisión profunda de MAXIM.} El modelo base se entrena con supervisión multi-etapa y multi-escala, un ingrediente central de MAXIM. La variante MoE descarta esa estructura: toma solo las características finales del backbone y produce una única salida con pérdida de una sola escala. Sin esa supervisión intermedia, el backbone ---entrenado además desde cero--- carece de las señales de gradiente que hacen converger a MAXIM.
+    \item \textbf{Capacidad insuficiente de los expertos.} Cada experto es una sola convolución $3\times 3$. Aun si el ruteo discriminara correctamente, una proyección lineal de las características compartidas difícilmente puede representar reconstrucciones específicas por tarea. El presupuesto de especialización es, sencillamente, demasiado pequeño.
+    \item \textbf{Condiciones de optimización restrictivas.} El tamaño de \textit{batch} de $2$, impuesto por la memoria disponible, produce estimaciones de gradiente ruidosas, lo que agrava la dificultad de entrenar un backbone profundo desde cero junto a un ruteador inestable.
+\end{enumerate}
+
+En cuanto al costo computacional, los expertos añaden una cantidad de parámetros despreciable, por lo que el sobrecosto de la propuesta sobre el backbone es marginal. El problema, entonces, no es de eficiencia sino de eficacia: la especialización no llegó a materializarse. La decisión metodológica de mayor impacto fue concentrar toda la especialización en una etapa de salida mínima y, simultáneamente, abandonar la supervisión profunda que sostiene el entrenamiento de MAXIM.
+
+Como subproducto, el trabajo deja una línea base sólida y reproducible: una versión multi-tarea de MAXIM que, a partir de una inicialización preentrenada, alcanza $25{,}5$~dB sobre la mezcla de cinco tareas, y una versión mono-tarea de referencia. Ambas resultan útiles como punto de comparación para futuras variantes.
 
 \section{Conclusiones}
 
-El cierre final se redactará una vez consolidados los resultados. La versión definitiva debe incluir:
-\begin{itemize}
-    \item síntesis de aportes concretos del trabajo;
-    \item principales hallazgos experimentales;
-    \item límites del enfoque implementado;
-    \item líneas de trabajo futuro.
-\end{itemize}
+El objetivo general de este trabajo fue evaluar si dotar a MAXIM de un esquema de Mixture of Experts en la etapa de reconstrucción aporta frente a una versión sin MoE. La evidencia experimental responde de forma negativa para la configuración estudiada: la variante MAXIM+MoE se estanca alrededor de $12{,}7$~dB de PSNR de validación, frente a los $23{,}1$ y $25{,}5$~dB de las versiones mono-tarea y multi-tarea sin MoE.
 
-Como guía de redacción final:
-\begin{enumerate}
-    \item retomar el objetivo general planteado en la Introducción;
-    \item conectar ese objetivo con evidencia concreta de la Sección IV;
-    \item cerrar con una valoración realista del alcance del modelo.
-\end{enumerate}
+El hallazgo principal no es, sin embargo, la mera diferencia de PSNR, sino su explicación. El ruteador converge a un régimen prácticamente uniforme ---entropía en su máximo $\ln K$ y balance de carga en su mínimo---, de modo que la mezcla de expertos degenera en un promedio de cabezas equivalentes y la especialización buscada nunca emerge. Este colapso es atribuible a la combinación de una regularización que premia la uniformidad, la pérdida de la supervisión profunda multi-escala de MAXIM, una capacidad de expertos demasiado baja y condiciones de optimización restrictivas.
+
+El alcance del modelo implementado es, por lo tanto, limitado: tal como está formulado, el esquema de expertos de salida no aprovecha el potencial de la idea de especialización. No obstante, el trabajo cumple un propósito de delimitación: identifica con precisión qué condiciones impiden que la propuesta funcione y, con ello, qué habría que cambiar para que la especialización tardía por expertos sea viable en restauración de imágenes. Las líneas base entrenadas como referencia constituyen, además, un aporte concreto y reutilizable.
 
 \section{Trabajo futuro}
 
-En esta sección se desarrollarán propuestas específicas para una siguiente iteración del proyecto, por ejemplo:
+Las causas identificadas sugieren intervenciones directas para una próxima iteración:
 \begin{itemize}
-    \item incorporar expertos en etapas internas del backbone;
-    \item evaluar ruteo jerárquico o condicional más fino;
-    \item extender la evaluación a nuevas tareas de restauración;
-    \item estudiar transferencia entre dominios.
+    \item \textbf{Preservar la supervisión profunda.} Conservar las salidas multi-etapa y multi-escala de MAXIM (o aplicar la mezcla de expertos sobre cada escala supervisada), de modo que el backbone reciba las señales de gradiente que necesita para converger.
+    \item \textbf{Inicializar desde pesos preentrenados.} Partir del \textit{backbone} preentrenado de MAXIM, como en la línea base multi-tarea, y reservar el entrenamiento desde cero solo para el ruteador y los expertos.
+    \item \textbf{Replantear la regularización del ruteo.} Reducir o eliminar el premio a la entropía, calibrar el balance de carga para evitar que domine la pérdida, y considerar una supervisión explícita de la tarea sobre el ruteador o un ruteo disperso (top-1/top-2) que fuerce decisiones discriminativas~\cite{shazeer2017moe,fedus2022switch}.
+    \item \textbf{Aumentar la capacidad de los expertos.} Reemplazar la convolución única por cabezas con varias capas o bloques residuales, de modo que cada experto pueda representar reconstrucciones realmente distintas; y explorar la incorporación de expertos en etapas internas del backbone.
+    \item \textbf{Mejorar las condiciones de optimización.} Emplear acumulación de gradiente o \textit{hardware} con más memoria para entrenar con \textit{batches} efectivos mayores, y extender la evaluación con métricas perceptuales (SSIM, LPIPS) y a resolución completa.
 \end{itemize}
 
 %\section{Aknowledgments}
@@ -356,8 +354,87 @@ En esta sección se desarrollarán propuestas específicas para una siguiente it
 MAM agradece a la UNC, en especial a los profesores Juan Ignacio Perotti, Francisco Tamarit y Benjamín Marcolongo
 por su esfuerzo y paciencia para dictar el curso de \textit{Redes Neuronales}.
 \end{acknowledgments}
-% Create the reference section using BibTeX:
-\bibliography{ref}
+% Referencias.
+% Se incluyen en línea (entorno thebibliography) para que el documento compile
+% con pdflatex sin depender del paso de BibTeX. Si se prefiere usar BibTeX,
+% comentar el bloque thebibliography y descomentar la línea siguiente
+% (el archivo ref.bib está disponible en este directorio):
+% \bibliography{ref}
+
+\begin{thebibliography}{99}
+
+\bibitem{tu2022maxim}
+Z.~Tu, H.~Talebi, H.~Zhang, F.~Yang, P.~Milanfar, A.~Bovik, and Y.~Li,
+\textit{MAXIM: Multi-Axis MLP for Image Processing},
+in Proc. IEEE/CVF Conf. on Computer Vision and Pattern Recognition (CVPR) (2022), pp. 5769--5780.
+
+\bibitem{jacobs1991mixtures}
+R.~A. Jacobs, M.~I. Jordan, S.~J. Nowlan, and G.~E. Hinton,
+\textit{Adaptive Mixtures of Local Experts},
+Neural Comput. \textbf{3}, 79 (1991).
+
+\bibitem{shazeer2017moe}
+N.~Shazeer, A.~Mirhoseini, K.~Maziarz, A.~Davis, Q.~Le, G.~Hinton, and J.~Dean,
+\textit{Outrageously Large Neural Networks: The Sparsely-Gated Mixture-of-Experts Layer},
+in Proc. Int. Conf. on Learning Representations (ICLR) (2017).
+
+\bibitem{fedus2022switch}
+W.~Fedus, B.~Zoph, and N.~Shazeer,
+\textit{Switch Transformers: Scaling to Trillion Parameter Models with Simple and Efficient Sparsity},
+J. Mach. Learn. Res. \textbf{23}, 1 (2022).
+
+\bibitem{nah2017gopro}
+S.~Nah, T.~H. Kim, and K.~M. Lee,
+\textit{Deep Multi-scale Convolutional Neural Network for Dynamic Scene Deblurring},
+in Proc. IEEE Conf. on Computer Vision and Pattern Recognition (CVPR) (2017).
+
+\bibitem{wei2018lol}
+C.~Wei, W.~Wang, W.~Yang, and J.~Liu,
+\textit{Deep Retinex Decomposition for Low-Light Enhancement},
+in Proc. British Machine Vision Conference (BMVC) (2018).
+
+\bibitem{abdelhamed2018sidd}
+A.~Abdelhamed, S.~Lin, and M.~S. Brown,
+\textit{A High-Quality Denoising Dataset for Smartphone Cameras},
+in Proc. IEEE Conf. on Computer Vision and Pattern Recognition (CVPR) (2018).
+
+\bibitem{li2019reside}
+B.~Li, W.~Ren, D.~Fu, D.~Tao, D.~Feng, W.~Zeng, and Z.~Wang,
+\textit{Benchmarking Single-Image Dehazing and Beyond},
+IEEE Trans. Image Process. \textbf{28}, 492 (2019).
+
+\bibitem{fu2017derain}
+X.~Fu, J.~Huang, D.~Zeng, Y.~Huang, X.~Ding, and J.~Paisley,
+\textit{Removing Rain from Single Images via a Deep Detail Network},
+in Proc. IEEE Conf. on Computer Vision and Pattern Recognition (CVPR) (2017).
+
+\bibitem{loshchilov2019adamw}
+I.~Loshchilov and F.~Hutter,
+\textit{Decoupled Weight Decay Regularization},
+in Proc. Int. Conf. on Learning Representations (ICLR) (2019).
+
+\bibitem{wang2004ssim}
+Z.~Wang, A.~C. Bovik, H.~R. Sheikh, and E.~P. Simoncelli,
+\textit{Image Quality Assessment: From Error Visibility to Structural Similarity},
+IEEE Trans. Image Process. \textbf{13}, 600 (2004).
+
+\bibitem{zhang2018lpips}
+R.~Zhang, P.~Isola, A.~A. Efros, E.~Shechtman, and O.~Wang,
+\textit{The Unreasonable Effectiveness of Deep Features as a Perceptual Metric},
+in Proc. IEEE/CVF Conf. on Computer Vision and Pattern Recognition (CVPR) (2018).
+
+\bibitem{jax2018}
+J.~Bradbury, R.~Frostig, P.~Hawkins, M.~J. Johnson, C.~Leary, D.~Maclaurin,
+G.~Necula, A.~Paszke, J.~VanderPlas, S.~Wanderman-Milne, and Q.~Zhang,
+\textit{JAX: Composable Transformations of Python+NumPy Programs} (2018),
+\url{http://github.com/google/jax}.
+
+\bibitem{flax2023}
+J.~Heek, A.~Levskaya, A.~Oliver, M.~Ritter, B.~Rondepierre, A.~Steiner, and M.~van Zee,
+\textit{Flax: A Neural Network Library and Ecosystem for JAX} (2023),
+\url{http://github.com/google/flax}.
+
+\end{thebibliography}
 
 \end{document}
 %
