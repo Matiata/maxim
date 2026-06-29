@@ -311,6 +311,14 @@ La Fig.~\ref{fig:cualit} contrasta reconstrucciones sobre muestras representativ
 \caption{\label{fig:cualit}Comparación cualitativa sobre muestras de validación de distintas tareas. De izquierda a derecha: entrada degradada, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia. La figura se genera con el \textit{script} \texttt{eval\_metrics.py} a partir de los \textit{checkpoints} guardados.}
 \end{figure}
 
+El modelo mono-tarea se omite de la Fig.~\ref{fig:cualit} porque, al estar especializado únicamente en la tarea \textit{enhance}, su reconstrucción carece de sentido sobre las demás degradaciones. Para una comparación justa, la Fig.~\ref{fig:cualit_enh} restringe el contraste a esa tarea e incorpora su salida junto a las del modelo multi-tarea y la variante MAXIM+MoE. Sobre su tarea de entrenamiento, el especialista mono-tarea produce una reconstrucción al nivel del modelo multi-tarea, mientras que la variante MoE conserva el deterioro observado en el resto de las tareas.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figs/fig_qualitative_enhance.pdf}
+\caption{\label{fig:cualit_enh}Comparación cualitativa sobre la tarea \textit{enhance}, la única en la que el modelo mono-tarea es directamente comparable. De izquierda a derecha: entrada degradada, MAXIM mono-tarea, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia. La figura se genera con el \textit{script} \texttt{eval\_metrics.py} a partir de los \textit{checkpoints} guardados.}
+\end{figure}
+
 \section{Discusión}
 
 Los resultados indican que, en la configuración evaluada, la variante MAXIM+MoE no mejora a la versión sin MoE; por el contrario, queda muy por debajo de ambas referencias. Conviene, antes que nada, separar lo que la comparación permite concluir de lo que no. La diferencia frente al modelo multi-tarea está parcialmente confundida por dos factores: la inicialización (ese modelo partió de pesos preentrenados de MAXIM, mientras que la variante MoE se entrenó desde cero) y la escala del backbone (el multi-tarea emplea la variante S-3, de mayor capacidad, frente a la S-2 del MoE). Por eso la comparación más limpia es contra la versión mono-tarea, que comparte con el MoE tanto la escala (S-2) como la inicialización aleatoria. Aun así, esa versión superó los $20$~dB en la época~6 y siguió mejorando, mientras que la variante MoE se estancó por debajo de los $13$~dB desde la época~3. La diferencia, entonces, no se explica ni por el tamaño del modelo ni por el preentrenamiento: el cuello de botella está en el propio diseño y entrenamiento de la variante MoE.

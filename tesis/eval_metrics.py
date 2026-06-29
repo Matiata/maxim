@@ -45,13 +45,18 @@ PATCH_SIZE = 256
 SEED = 42
 NUM_EXPERTS = 5
 
-# Progreso / modo rápido.
-# EVAL_LIMIT: tope de imágenes por tarea (None = todas). Útil para un smoke test
-# rápido (p. ej. EVAL_LIMIT = 8) y confirmar que todo corre antes de lanzar la
-# evaluación completa, que sobre los test sets enteros tarda bastante.
-EVAL_LIMIT = None
+# Progreso / submuestreo.
+# EVAL_LIMIT: máximo de imágenes evaluadas POR TAREA (None = todas; con batch=4
+# equivale a EVAL_LIMIT/4 batches). Las imágenes se eligen como una submuestra
+# ALEATORIA UNIFORME con semilla fija (ver iter_val_pairs), así que el PSNR/SSIM
+# promedio sigue siendo un estimador INSESGADO de la métrica sobre el test
+# completo: solo baja la precisión (error estándar ~ 1/sqrt(EVAL_LIMIT)), no
+# introduce sesgo. 200 da una estimación estable; subir para más precisión,
+# bajar para un smoke test. Las tareas con menos de EVAL_LIMIT imágenes (denoise,
+# enhance, dehaze) se evalúan completas igual.
+EVAL_LIMIT = 200
 # Cada cuántas imágenes se imprime una línea de progreso dentro de cada tarea.
-PROGRESS_EVERY = 100
+PROGRESS_EVERY = 50
 
 # Carpeta raíz con una subcarpeta por tarea (cada una con imgs/, GT/, test.txt).
 DATA_ROOT = "/content/gdrive/MyDrive/Facultad/tesis/Datasets/Classifier"
@@ -66,11 +71,22 @@ CHECKPOINTS = [
     ("MAXIM+MoE",         "moe",  "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/moe_training/best_checkpoint/checkpoint_41"),
 ]
 
-# La figura cualitativa contrasta estos dos modelos (por etiqueta) contra la GT.
+# La figura cualitativa contrasta estos modelos (por etiqueta) contra la GT.
+# El orden aquí es el orden de las columnas en la figura.
+QUALITATIVE_MONO = "MAXIM mono-tarea"
 QUALITATIVE_BASELINE = "MAXIM multi-tarea"
 QUALITATIVE_MOE = "MAXIM+MoE"
+
+# Figura principal: una fila por tarea, multi-tarea vs MoE (sin el modelo
+# mono-tarea, que solo es especialista en enhance y bajaría en las demás filas).
 OUT_FIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
                        "fig_qualitative.pdf")
+
+# Figura secundaria: una sola fila (tarea enhance) que sí incluye el modelo
+# mono-tarea, comparándolo de forma justa con multi-tarea y MoE en su tarea.
+QUALITATIVE_ENHANCE_TASK = "enhance"
+OUT_FIG_ENHANCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
+                               "fig_qualitative_enhance.pdf")
 
 _MODEL_CONFIGS = {
     "variant": "", "dropout_rate": 0.1, "num_outputs": 3,
@@ -151,13 +167,22 @@ def _center_crop(img, size):
 
 
 def iter_val_pairs(task, limit=None):
-    """Genera (input, target) en [0,1], recortados a PATCH_SIZE, para una tarea."""
+    """Genera (input, target) en [0,1], recortados a PATCH_SIZE, para una tarea.
+
+    Si `limit` se especifica y es menor que el conjunto, se evalúa sobre una
+    submuestra ALEATORIA UNIFORME (semilla fija = SEED), no sobre las primeras
+    `limit` imágenes. Como las métricas se reportan como promedio sobre el test,
+    una submuestra uniforme es un estimador insesgado de esa media; tomar las
+    primeras N sesgaría el resultado si test.txt está ordenado por escena/condición.
+    """
     base = os.path.join(DATA_ROOT, task)
     list_file = os.path.join(base, "test.txt")
     with open(list_file) as f:
         names = [ln.strip() for ln in f if ln.strip()]
-    if limit:
-        names = names[:limit]
+    if limit and limit < len(names):
+        rng = np.random.default_rng(SEED)
+        idx = np.sort(rng.permutation(len(names))[:limit])
+        names = [names[i] for i in idx]
     for name in names:
         ip = os.path.join(base, "imgs", name)
         tp = os.path.join(base, "GT", name)
@@ -288,51 +313,91 @@ def evaluate_checkpoint(label, kind, variant, ckpt_dir, batch=4):
     return psnr, ssim, (model, state, kind)
 
 
-def make_qualitative(models, n_per_fig=None):
-    """Genera fig_qualitative.pdf: una fila por tarea."""
+def _render_qualitative(models, model_labels, tasks, out_path):
+    """Renderiza una grilla cualitativa y la guarda en out_path.
+
+    Una fila por tarea en `tasks`; columnas = Entrada + un modelo por cada
+    etiqueta de `model_labels` presente en `models` + Referencia. Devuelve True
+    si escribió la figura.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    base = models[QUALITATIVE_BASELINE]
-    moe = models[QUALITATIVE_MOE]
+    name = os.path.basename(out_path)
+    model_cols = [lbl for lbl in model_labels if lbl in models]
+    if not model_cols:
+        log(f"[aviso] sin modelos disponibles para {name}; se omite.")
+        return False
+    col_titles = ["Entrada (degradada)"] + model_cols + ["Referencia"]
+    ncols = len(col_titles)
+
     rows = []
-    log("\nGenerando figura cualitativa (1 ejemplo por tarea)...")
-    for task in TASKS:
+    log(f"\nGenerando {name} ({len(tasks)} fila(s); columnas: "
+        f"{', '.join(model_cols)})...")
+    for task in tasks:
         for x, y in iter_val_pairs(task, limit=1):
-            pb = _predict(base[2], base[0], base[1], x[None])[0]
-            pm = _predict(moe[2], moe[0], moe[1], x[None])[0]
-            rows.append((task, x, pb, pm, y))
+            preds = [_predict(models[lbl][2], models[lbl][0], models[lbl][1], x[None])[0]
+                     for lbl in model_cols]
+            rows.append((task, x, preds, y))
             log(f"  fila {task} lista.")
             break
+    if not rows:
+        log(f"[aviso] sin imágenes para {name}; se omite.")
+        return False
 
-    cols = ["Entrada (degradada)", "MAXIM multi-tarea", "MAXIM+MoE", "Referencia"]
-    fig, axes = plt.subplots(len(rows), 4, figsize=(7.0, 1.8 * len(rows)))
+    fig, axes = plt.subplots(len(rows), ncols,
+                             figsize=(1.75 * ncols, 1.8 * len(rows)))
     if len(rows) == 1:
         axes = axes[None, :]
-    for r, (task, x, pb, pm, y) in enumerate(rows):
-        for c, img in enumerate([x, pb, pm, y]):
+    for r, (task, x, preds, y) in enumerate(rows):
+        for c, img in enumerate([x] + preds + [y]):
             ax = axes[r, c]
             ax.imshow(np.clip(img, 0, 1))
             ax.set_xticks([]); ax.set_yticks([])
             if r == 0:
-                ax.set_title(cols[c], fontsize=8)
+                ax.set_title(col_titles[c], fontsize=8)
             if c == 0:
                 ax.set_ylabel(task, fontsize=8)
     fig.tight_layout()
-    fig.savefig(OUT_FIG, bbox_inches="tight")
-    # quitar la marca de plantilla para que make_figs.py no lo sobrescriba
-    flag = os.path.join(os.path.dirname(OUT_FIG), ".fig_qualitative_is_placeholder")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    fig.savefig(out_path, bbox_inches="tight")
+    plt.close(fig)
+    # quitar la marca de plantilla (si existe) para que make_figs.py no
+    # sobrescriba la figura real en la próxima corrida.
+    stem = os.path.splitext(os.path.basename(out_path))[0]
+    flag = os.path.join(os.path.dirname(out_path), f".{stem}_is_placeholder")
     if os.path.exists(flag):
         os.remove(flag)
-    log(f"\nFigura cualitativa escrita en {OUT_FIG}")
+    log(f"Figura escrita en {out_path}")
+    return True
+
+
+def make_qualitative(models):
+    """Figura principal de la tesis (fig_qualitative.pdf): una fila por tarea,
+    contrasta multi-tarea vs MoE contra la GT. No incluye el modelo mono-tarea
+    porque solo es especialista en enhance y bajaría en las otras filas."""
+    _render_qualitative(models,
+                        [QUALITATIVE_BASELINE, QUALITATIVE_MOE],
+                        TASKS, OUT_FIG)
+
+
+def make_qualitative_enhance(models):
+    """Figura secundaria (fig_qualitative_enhance.pdf): una sola fila para la
+    tarea enhance, comparando mono-tarea vs multi-tarea vs MoE contra la GT.
+    Aquí el modelo mono-tarea (single_task_enhance) sí es comparable, porque es
+    su tarea de entrenamiento."""
+    _render_qualitative(models,
+                        [QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE],
+                        [QUALITATIVE_ENHANCE_TASK], OUT_FIG_ENHANCE)
 
 
 def main():
     log(f"Evaluando {len(CHECKPOINTS)} checkpoints sobre {len(TASKS)} tareas.")
     log(f"DATA_ROOT = {DATA_ROOT}")
     if EVAL_LIMIT:
-        log(f"** Modo rápido: EVAL_LIMIT = {EVAL_LIMIT} imágenes por tarea **")
+        log(f"** Submuestra de {EVAL_LIMIT} imágenes/tarea (aleatoria uniforme, "
+            f"seed={SEED}); el promedio es estimación insesgada del test completo **")
 
     results, models = {}, {}
     for i, (label, kind, variant, ckpt) in enumerate(CHECKPOINTS, 1):
@@ -352,8 +417,10 @@ def main():
         s = f"{ssim:.3f}".replace(".", "{,}")
         log(f"  {label}: PSNR ${p}$   SSIM ${s}$")
 
-    if QUALITATIVE_BASELINE in models and QUALITATIVE_MOE in models:
+    if any(lbl in models for lbl in
+           (QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE)):
         make_qualitative(models)
+        make_qualitative_enhance(models)
     else:
         log("\n[aviso] faltan checkpoints para la figura cualitativa.")
 
