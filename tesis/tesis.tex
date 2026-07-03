@@ -131,7 +131,7 @@ Restauración de imágenes con MAXIM y Mixture of Experts
 % \date{\today}
 
 \begin{abstract}
-Este trabajo aborda la restauración de imágenes mediante una variante de MAXIM (Multi-Axis MLP) con un esquema de Mixture of Experts (MoE), que combina un backbone compartido con un ruteador que pondera dinámicamente un conjunto de cabezas expertas de reconstrucción, buscando especialización sin duplicar el costo de las etapas profundas. Sobre un conjunto unificado de cinco tareas, dos versiones de MAXIM sin MoE ---mono-tarea y multi-tarea--- alcanzan $23{,}1$ y $25{,}5$~dB de PSNR de validación, mientras que la variante MAXIM+MoE se estanca en torno a $12{,}7$~dB con un ruteador que colapsa a un régimen prácticamente uniforme. Analizamos las causas ---la pérdida de la supervisión profunda multi-escala de MAXIM, la baja capacidad de los expertos y una regularización que premia el ruteo uniforme--- y derivamos líneas concretas de mejora. El resultado, negativo pero informativo, delimita las condiciones bajo las cuales la especialización tardía por expertos podría aportar valor en restauración de imágenes.
+Este trabajo aborda la restauración de imágenes mediante una variante de MAXIM (Multi-Axis MLP) con un esquema de Mixture of Experts (MoE), que combina un backbone compartido con un ruteador que pondera dinámicamente un conjunto de cabezas expertas de reconstrucción, buscando especialización sin duplicar el costo de las etapas profundas. Sobre un conjunto unificado de cinco tareas, las versiones de MAXIM sin MoE alcanzan entre $23{,}1$ y $25{,}5$~dB de PSNR de validación ---incluida una de idéntica escala e inicialización que la propuesta, que llega a $24{,}8$~dB---, mientras que la variante MAXIM+MoE se estanca en torno a $12{,}7$~dB con un ruteador que colapsa a un régimen prácticamente uniforme. Analizamos las causas ---la pérdida de la supervisión profunda multi-escala de MAXIM, la baja capacidad de los expertos y una regularización que premia el ruteo uniforme--- y derivamos líneas concretas de mejora. El resultado, negativo pero informativo, delimita las condiciones bajo las cuales la especialización tardía por expertos podría aportar valor en restauración de imágenes.
 \end{abstract}
 
 % insert suggested keywords - APS authors don't need to do this
@@ -155,7 +155,7 @@ Los objetivos de este trabajo son:
     \item Analizar, mediante resultados cuantitativos y el diagnóstico del ruteador, en qué medida la especialización por expertos aporta frente a una versión sin MoE.
 \end{itemize}
 
-La organización del documento es la siguiente. En la Sección~II se presentan los fundamentos teóricos de MAXIM y de MoE. En la Sección~III se detalla la metodología implementada: arquitectura, datos, protocolo de entrenamiento y métricas. La Sección~IV reporta los resultados cuantitativos de las tres configuraciones entrenadas y el análisis del ruteador. Las Secciones~V y~VI discuten los hallazgos y presentan las conclusiones, y la Sección~VII delinea el trabajo futuro.
+La organización del documento es la siguiente. En la Sección~II se presentan los fundamentos teóricos de MAXIM y de MoE. En la Sección~III se detalla la metodología implementada: arquitectura, datos, protocolo de entrenamiento y métricas. La Sección~IV reporta los resultados cuantitativos de las cuatro configuraciones entrenadas y el análisis del ruteador. Las Secciones~V y~VI discuten los hallazgos y presentan las conclusiones, y la Sección~VII delinea el trabajo futuro.
 
 \section{Teoría}
 
@@ -227,14 +227,15 @@ Durante el entrenamiento, las muestras se extraen de las cinco tareas con un esq
 
 \subsection{Protocolo de entrenamiento}
 
-Se entrenaron tres configuraciones que comparten infraestructura, hiperparámetros base y definición de las métricas. Las dos que operan sobre la mezcla completa ---MAXIM multi-tarea y MAXIM+MoE--- comparten exactamente el mismo conjunto de validación, por lo que son directamente comparables; la versión mono-tarea se valida sobre una sola tarea y se incluye como punto de referencia adicional:
+Se entrenaron cuatro configuraciones que comparten infraestructura, hiperparámetros base y definición de las métricas. Tres de ellas operan sobre la mezcla completa de las cinco tareas y comparten exactamente el mismo conjunto de validación, por lo que son directamente comparables entre sí; la cuarta (mono-tarea) se valida sobre una sola tarea y se incluye como referencia adicional:
 \begin{itemize}
     \item \textbf{MAXIM mono-tarea}: el modelo base (variante S-2), sin MoE, entrenado desde inicialización aleatoria sobre una única tarea de restauración (realce);
-    \item \textbf{MAXIM multi-tarea}: el modelo base (variante S-3), sin MoE, entrenado sobre la mezcla de las cinco tareas e inicializado desde un \textit{checkpoint} preentrenado de MAXIM (Enhancement/LOL);
-    \item \textbf{MAXIM+MoE}: la variante propuesta, cuyo backbone es la variante S-2, entrenada sobre la misma mezcla de cinco tareas pero desde inicialización aleatoria.
+    \item \textbf{MAXIM multi-tarea (pre-entrenado)}: el modelo base (variante S-3), sin MoE, entrenado sobre la mezcla de las cinco tareas e inicializado desde un \textit{checkpoint} preentrenado de MAXIM (Enhancement/LOL);
+    \item \textbf{MAXIM multi-tarea (desde cero)}: el modelo base sin MoE en la variante S-2, entrenado sobre la misma mezcla pero desde inicialización aleatoria; comparte escala e inicialización con la variante MoE y constituye la comparación más justa;
+    \item \textbf{MAXIM+MoE}: la variante propuesta, cuyo backbone es la variante S-2, entrenada sobre la misma mezcla de cinco tareas y desde inicialización aleatoria.
 \end{itemize}
 
-Las variantes S-2 y S-3 de MAXIM se diferencian en el número de etapas de procesamiento (dos y tres, respectivamente): a mayor número de etapas, mayor capacidad del modelo y más puntos de supervisión. Conviene notar que la variante MoE comparte tanto la escala (S-2) como la inicialización aleatoria con la línea base mono-tarea, lo que permite aislar el efecto del esquema de expertos y de la supervisión de una sola escala.
+Las variantes S-2 y S-3 de MAXIM se diferencian en el número de etapas de procesamiento (dos y tres, respectivamente): a mayor número de etapas, mayor capacidad del modelo y más puntos de supervisión. Conviene notar que la variante MoE y la versión multi-tarea desde cero comparten escala (S-2), inicialización aleatoria y conjunto de datos: su única diferencia es el esquema de expertos con supervisión de una sola escala, lo que permite aislar con precisión el efecto de la propuesta.
 
 La función de pérdida del modelo base es un error absoluto medio (L1) con \emph{supervisión profunda}: se evalúa en las salidas de todas las etapas y escalas de MAXIM, con un peso $0{,}5^{\,(S-1-i)}$ para la escala $i$ de un total de $S=3$ escalas de supervisión. En la variante MoE, en cambio, el camino de cómputo produce una única salida a resolución completa, por lo que la pérdida de reconstrucción es un L1 de una sola escala. A esta se suma la regularización del ruteador,
 \begin{equation}
@@ -248,7 +249,7 @@ En todas las configuraciones se utilizó el optimizador AdamW~\cite{loshchilov20
 
 \subsection{Métricas de evaluación}
 
-La calidad de reconstrucción se cuantifica con la \emph{PSNR} (\textit{Peak Signal-to-Noise Ratio}) sobre el conjunto de validación, calculada de manera idéntica en las tres configuraciones a partir del error cuadrático medio en escala $[0,255]$,
+La calidad de reconstrucción se cuantifica con la \emph{PSNR} (\textit{Peak Signal-to-Noise Ratio}) sobre el conjunto de validación, calculada de manera idéntica en las cuatro configuraciones a partir del error cuadrático medio en escala $[0,255]$,
 \begin{equation}
 \mathrm{PSNR} = 20\,\log_{10}\!\left(\frac{255}{\sqrt{\mathrm{MSE}}}\right).
 \end{equation}
@@ -260,13 +261,13 @@ La implementación se realiza en Python sobre el ecosistema JAX/Flax~\cite{jax20
 
 \section{Resultados}
 
-Se reportan los resultados de las tres configuraciones descritas en la metodología, todas entrenadas y evaluadas con el mismo protocolo. El análisis se centra en la PSNR de validación, en la dinámica de entrenamiento de la variante MoE y en el comportamiento de su ruteador.
+Se reportan los resultados de las cuatro configuraciones descritas en la metodología, todas entrenadas y evaluadas con el mismo protocolo. El análisis se centra en la PSNR de validación, en la dinámica de entrenamiento de la variante MoE y en el comportamiento de su ruteador.
 
 \subsection{Resultados cuantitativos}
 
-La Tabla~\ref{tab:cuant} resume el desempeño de las tres configuraciones, y la Fig.~\ref{fig:valpsnr} muestra la evolución de la PSNR de validación a lo largo del entrenamiento. Las dos versiones sin MoE convergen al rango esperado para MAXIM: la versión multi-tarea, beneficiada por la inicialización preentrenada, alcanza $25{,}5$~dB, mientras que la versión mono-tarea, entrenada desde cero, llega a $23{,}1$~dB con una curva más ruidosa pero claramente ascendente.
+La Tabla~\ref{tab:cuant} resume el desempeño de las cuatro configuraciones, y la Fig.~\ref{fig:valpsnr} muestra la evolución de la PSNR de validación a lo largo del entrenamiento. Las tres versiones sin MoE convergen al rango esperado para MAXIM: la multi-tarea pre-entrenada (S-3) alcanza $25{,}5$~dB y la multi-tarea desde cero (S-2) llega a $24{,}8$~dB, muy cerca de aquella pese a partir de pesos aleatorios y de una escala menor; la mono-tarea llega a $23{,}1$~dB con una curva más ruidosa pero claramente ascendente.
 
-La variante MAXIM+MoE presenta un comportamiento marcadamente distinto. Tras una mejora inicial muy rápida durante las primeras tres épocas ---en las que pasa de $\sim\!10{,}5$ a $\sim\!12{,}3$~dB---, la PSNR de validación se estanca y oscila en torno a $12{,}5$--$12{,}7$~dB sin progreso apreciable. El mejor \textit{checkpoint} alcanza $12{,}7$~dB, una diferencia de casi $13$~dB respecto del modelo base multi-tarea, que se evalúa sobre el mismo conjunto de validación. Prolongar el entrenamiento más allá de las $60$ épocas no modificó este estancamiento, lo que descarta que se trate de un presupuesto de cómputo insuficiente. La versión mono-tarea, aunque se evalúa sobre una sola tarea, ofrece un contraste adicional útil: entrenada también desde cero, supera los $20$~dB ya en la época~6, mientras que la variante MoE nunca despega de la franja de los $12$--$13$~dB.
+La variante MAXIM+MoE presenta un comportamiento marcadamente distinto. Tras una mejora inicial muy rápida durante las primeras tres épocas ---en las que pasa de $\sim\!10{,}5$ a $\sim\!12{,}3$~dB---, la PSNR de validación se estanca y oscila en torno a $12{,}5$--$12{,}7$~dB sin progreso apreciable. El mejor \textit{checkpoint} alcanza $12{,}7$~dB. La comparación decisiva es con la versión multi-tarea desde cero: con idéntica escala (S-2), idéntica inicialización aleatoria, el mismo conjunto de entrenamiento y validación y el mismo presupuesto de $30$ épocas, esa versión sin MoE alcanza $24{,}8$~dB, es decir, unos $12$~dB por encima. Prolongar el entrenamiento de la variante MoE más allá de las $60$ épocas no modificó su estancamiento, lo que descarta un presupuesto de cómputo insuficiente.
 
 \begin{table}[ht]
 \caption{\label{tab:cuant}Comparación cuantitativa sobre el conjunto de validación (parches de $256\times 256$). Se reporta la mejor PSNR alcanzada, la SSIM asociada y la pérdida L1 de validación. ``Escala'' indica la variante de MAXIM (S-2 o S-3, según el número de etapas); ``Inic.'' la inicialización (aleatoria o desde \textit{checkpoint} preentrenado) y ``Sup.'' el tipo de supervisión (multi-escala o de una sola escala). Los valores de SSIM, marcados con ``---'', se obtienen ejecutando el \textit{script} de evaluación \texttt{eval\_metrics.py} sobre los \textit{checkpoints} guardados.}
@@ -276,6 +277,7 @@ Modelo & Escala & Inic. & Sup. & PSNR (dB) & SSIM & L1 val. \\
 \hline
 MAXIM mono-tarea   & S-2 & aleat.   & multi  & $23{,}1$ & --- & $0{,}068$ \\
 MAXIM multi-tarea  & S-3 & preentr. & multi  & $\mathbf{25{,}5}$ & --- & $\mathbf{0{,}042}$ \\
+MAXIM multi-tarea  & S-2 & aleat.   & multi  & $24{,}8$ & --- & $0{,}046$ \\
 MAXIM+MoE          & S-2 & aleat.   & simple & $12{,}7$ & --- & $0{,}193$ \\
 \end{tabular}
 \end{ruledtabular}
@@ -284,7 +286,7 @@ MAXIM+MoE          & S-2 & aleat.   & simple & $12{,}7$ & --- & $0{,}193$ \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig_val_psnr.pdf}
-\caption{\label{fig:valpsnr}Evolución de la PSNR de validación durante el entrenamiento, para un presupuesto común de $30$ épocas. Las dos versiones de MAXIM sin MoE mejoran de forma sostenida, mientras que la variante MAXIM+MoE se estanca tempranamente muy por debajo de ambas. La curva mono-tarea comienza en la época~6 por el rango disponible en el registro de entrenamiento.}
+\caption{\label{fig:valpsnr}Evolución de la PSNR de validación durante el entrenamiento, para un presupuesto común de $30$ épocas. Las tres versiones de MAXIM sin MoE ---multi-tarea pre-entrenada (S-3), multi-tarea desde cero (S-2) y mono-tarea (S-2)--- mejoran de forma sostenida y se agrupan por encima de $23$~dB, mientras que la variante MAXIM+MoE se estanca tempranamente en torno a $12{,}7$~dB. La comparación más justa es entre MAXIM+MoE y la multi-tarea desde cero, que comparten escala e inicialización. La curva mono-tarea comienza en la época~6 por el rango disponible en el registro de entrenamiento.}
 \end{figure}
 
 \subsection{Dinámica de entrenamiento y comportamiento del ruteador}
@@ -321,24 +323,23 @@ El modelo mono-tarea se omite de la Fig.~\ref{fig:cualit} porque, al estar espec
 
 \section{Discusión}
 
-Los resultados indican que, en la configuración evaluada, la variante MAXIM+MoE no mejora a la versión sin MoE; por el contrario, queda muy por debajo de ambas referencias. Conviene, antes que nada, separar lo que la comparación permite concluir de lo que no. La diferencia frente al modelo multi-tarea está parcialmente confundida por dos factores: la inicialización (ese modelo partió de pesos preentrenados de MAXIM, mientras que la variante MoE se entrenó desde cero) y la escala del backbone (el multi-tarea emplea la variante S-3, de mayor capacidad, frente a la S-2 del MoE). Por eso la comparación más limpia es contra la versión mono-tarea, que comparte con el MoE tanto la escala (S-2) como la inicialización aleatoria. Aun así, esa versión superó los $20$~dB en la época~6 y siguió mejorando, mientras que la variante MoE se estancó por debajo de los $13$~dB desde la época~3. La diferencia, entonces, no se explica ni por el tamaño del modelo ni por el preentrenamiento: el cuello de botella está en el propio diseño y entrenamiento de la variante MoE.
+Los resultados indican que, en la configuración evaluada, la variante MAXIM+MoE no mejora a la versión sin MoE; por el contrario, queda muy por debajo de todas las referencias. La comparación clave es con la versión multi-tarea entrenada desde cero, diseñada precisamente para eliminar factores de confusión: comparte con la variante MoE la escala del backbone (S-2), la inicialización aleatoria, el conjunto de entrenamiento y validación y el presupuesto de $30$ épocas. Su única diferencia es el esquema de expertos con supervisión de una sola escala. Como esa versión alcanza $24{,}8$~dB frente a los $12{,}7$~dB del MoE, la brecha no puede atribuirse ni al preentrenamiento ni al tamaño del modelo: el cuello de botella está en el propio diseño y entrenamiento de la variante MoE.
 
-El análisis del ruteador (Fig.~\ref{fig:moedyn}) apunta a un \emph{colapso hacia el ruteo uniforme}. Identificamos cuatro factores que, en conjunto, explican el comportamiento observado:
+El análisis del ruteador (Fig.~\ref{fig:moedyn}) apunta a un \emph{colapso hacia el ruteo uniforme}. Identificamos tres factores, todos propios de la variante MoE, que explican el comportamiento observado:
 
 \begin{enumerate}
     \item \textbf{Regularización que premia la uniformidad.} El término de entropía (maximizado) y el de balance de carga (que es mínimo en la distribución uniforme) tienen su óptimo en el mismo punto. En ausencia de una señal que favorezca la concentración del ruteo, ambos términos arrastran al ruteador hacia pesos iguales, que es exactamente el régimen no especializado que se buscaba evitar.
-    \item \textbf{Pérdida de la supervisión profunda de MAXIM.} El modelo base se entrena con supervisión multi-etapa y multi-escala, un ingrediente central de MAXIM. La variante MoE descarta esa estructura: toma solo las características finales del backbone y produce una única salida con pérdida de una sola escala. Sin esa supervisión intermedia, el backbone ---entrenado además desde cero--- carece de las señales de gradiente que hacen converger a MAXIM.
+    \item \textbf{Pérdida de la supervisión profunda de MAXIM.} El modelo base se entrena con supervisión multi-etapa y multi-escala, un ingrediente central de MAXIM. La variante MoE descarta esa estructura: toma solo las características finales del backbone y produce una única salida con pérdida de una sola escala. Sin esa supervisión intermedia, el backbone carece de las señales de gradiente que hacen converger a MAXIM.
     \item \textbf{Capacidad insuficiente de los expertos.} Cada experto es una sola convolución $3\times 3$. Aun si el ruteo discriminara correctamente, una proyección lineal de las características compartidas difícilmente puede representar reconstrucciones específicas por tarea. El presupuesto de especialización es, sencillamente, demasiado pequeño.
-    \item \textbf{Condiciones de optimización restrictivas.} El tamaño de \textit{batch} de $2$, impuesto por la memoria disponible, produce estimaciones de gradiente ruidosas, lo que agrava la dificultad de entrenar un backbone profundo desde cero junto a un ruteador inestable.
 \end{enumerate}
 
-En cuanto al costo computacional, los expertos añaden una cantidad de parámetros despreciable, por lo que el sobrecosto de la propuesta sobre el backbone es marginal. El problema, entonces, no es de eficiencia sino de eficacia: la especialización no llegó a materializarse. La decisión metodológica de mayor impacto fue concentrar toda la especialización en una etapa de salida mínima y, simultáneamente, abandonar la supervisión profunda que sostiene el entrenamiento de MAXIM.
+Descartamos, en cambio, que el problema provenga de las condiciones compartidas de entrenamiento ---inicialización aleatoria y \textit{batch} de tamaño $2$---, ya que la versión multi-tarea desde cero opera bajo esas mismas condiciones y sí converge. En cuanto al costo computacional, los expertos añaden una cantidad de parámetros despreciable, por lo que el sobrecosto de la propuesta sobre el backbone es marginal. El problema, entonces, no es de eficiencia sino de eficacia: la especialización no llegó a materializarse. La decisión metodológica de mayor impacto fue concentrar toda la especialización en una etapa de salida mínima y, simultáneamente, abandonar la supervisión profunda que sostiene el entrenamiento de MAXIM.
 
-Como subproducto, el trabajo deja una línea base sólida y reproducible: una versión multi-tarea de MAXIM que, a partir de una inicialización preentrenada, alcanza $25{,}5$~dB sobre la mezcla de cinco tareas, y una versión mono-tarea de referencia. Ambas resultan útiles como punto de comparación para futuras variantes.
+Como subproducto, el trabajo deja líneas base sólidas y reproducibles: versiones multi-tarea de MAXIM que alcanzan entre $24{,}8$ y $25{,}5$~dB sobre la mezcla de cinco tareas ---con y sin preentrenamiento--- y una versión mono-tarea de referencia. Todas resultan útiles como punto de comparación para futuras variantes.
 
 \section{Conclusiones}
 
-El objetivo general de este trabajo fue evaluar si dotar a MAXIM de un esquema de Mixture of Experts en la etapa de reconstrucción aporta frente a una versión sin MoE. La evidencia experimental responde de forma negativa para la configuración estudiada: la variante MAXIM+MoE se estanca alrededor de $12{,}7$~dB de PSNR de validación, frente a los $23{,}1$ y $25{,}5$~dB de las versiones mono-tarea y multi-tarea sin MoE.
+El objetivo general de este trabajo fue evaluar si dotar a MAXIM de un esquema de Mixture of Experts en la etapa de reconstrucción aporta frente a una versión sin MoE. La evidencia experimental responde de forma negativa para la configuración estudiada: la variante MAXIM+MoE se estanca alrededor de $12{,}7$~dB de PSNR de validación, frente a los $23{,}1$--$25{,}5$~dB de las versiones sin MoE; en particular, una versión sin MoE de idéntica escala e inicialización alcanza $24{,}8$~dB, lo que aísla el problema en el diseño de la propuesta y no en factores de confusión.
 
 El hallazgo principal no es, sin embargo, la mera diferencia de PSNR, sino su explicación. El ruteador converge a un régimen prácticamente uniforme ---entropía en su máximo $\ln K$ y balance de carga en su mínimo---, de modo que la mezcla de expertos degenera en un promedio de cabezas equivalentes y la especialización buscada nunca emerge. Este colapso es atribuible a la combinación de una regularización que premia la uniformidad, la pérdida de la supervisión profunda multi-escala de MAXIM, una capacidad de expertos demasiado baja y condiciones de optimización restrictivas.
 

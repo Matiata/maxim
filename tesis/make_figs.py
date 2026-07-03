@@ -44,10 +44,11 @@ plt.rcParams.update({
 })
 
 # Colour-blind friendly palette (Okabe-Ito subset).
-C_MULTI = "#0072B2"   # blue   -> MAXIM multi-task baseline
-C_SINGLE = "#009E73"  # green  -> MAXIM single-task baseline
-C_MOE = "#D55E00"     # orange -> MAXIM+MoE
-C_AUX = "#5A5A5A"     # grey   -> references / second axis
+C_MULTI = "#0072B2"    # blue          -> MAXIM multi-task (S-3, warm start)
+C_MULTI_S = "#CC79A7"  # reddish purple -> MAXIM multi-task (S-2, from scratch; fair)
+C_SINGLE = "#009E73"   # green         -> MAXIM single-task baseline
+C_MOE = "#D55E00"      # orange        -> MAXIM+MoE
+C_AUX = "#5A5A5A"      # grey          -> references / second axis
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +115,8 @@ def series(d, key):
 moe_tr, moe_va = parse_moe(os.path.join(ROOT, "moe_outputs", "training_outs_2.txt"))
 st_tr, st_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "single_task.txt"))
 mt_tr, mt_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "multi_task.txt"))
+# Fair comparison: multi-task, S-2 backbone, random init (same scale + init as the MoE).
+mts_tr, mts_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "multi_task_scratch.txt"))
 
 NUM_EXPERTS = 5
 LN_K = math.log(NUM_EXPERTS)
@@ -125,10 +128,12 @@ def best(d, key="psnr"):
     return ep[i], v[i]
 
 print("=== Best validation PSNR (dB) ===")
-for name, d in [("MAXIM multi-task", mt_va), ("MAXIM single-task", st_va),
+for name, d in [("MAXIM multi (S-3 warm)", mt_va),
+                ("MAXIM multi (S-2 scratch)", mts_va),
+                ("MAXIM single-task", st_va),
                 ("MAXIM+MoE", moe_va)]:
     e, p = best(d)
-    print(f"  {name:20s}: {p:6.2f} dB  (epoch {e})")
+    print(f"  {name:26s}: {p:6.2f} dB  (epoch {e})")
 print("=== MoE router (last epoch) ===")
 le = max(moe_tr)
 print(f"  entropy={moe_tr[le]['entropy']:.4f}  ln(K)={LN_K:.4f}  "
@@ -143,13 +148,14 @@ def fig_val_psnr():
     EMAX = 30  # matched training budget
 
     for d, c, lab, mk in [
-        (mt_va, C_MULTI, "MAXIM multi-tarea", "o"),
-        (st_va, C_SINGLE, "MAXIM mono-tarea", "s"),
-        (moe_va, C_MOE, "MAXIM+MoE", "^"),
+        (mt_va, C_MULTI, "MAXIM multi-tarea (S-3, pre-entr.)", "o"),
+        (mts_va, C_MULTI_S, "MAXIM multi-tarea (S-2, aleat.)", "D"),
+        (st_va, C_SINGLE, "MAXIM mono-tarea (S-2, aleat.)", "s"),
+        (moe_va, C_MOE, "MAXIM+MoE (S-2, aleat.)", "^"),
     ]:
         ep, v = series(d, "psnr")
         mask = ep <= EMAX
-        ax.plot(ep[mask], v[mask], color=c, marker=mk, markersize=3.0,
+        ax.plot(ep[mask], v[mask], color=c, marker=mk, markersize=2.8,
                 markevery=2, label=lab)
 
     ax.set_xlabel("Época")
@@ -157,7 +163,8 @@ def fig_val_psnr():
     ax.set_xlim(1, EMAX)
     ax.set_ylim(9, 27)
     ax.grid(True, linestyle="--")
-    ax.legend(loc="center right", frameon=False, handlelength=1.6)
+    ax.legend(loc="center right", frameon=True, framealpha=0.88, edgecolor="none",
+              handlelength=1.6, fontsize=7.0)
     fig.savefig(os.path.join(OUT, "fig_val_psnr.pdf"))
     plt.close(fig)
 
