@@ -88,6 +88,17 @@ QUALITATIVE_ENHANCE_TASK = "enhance"
 OUT_FIG_ENHANCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
                                "fig_qualitative_enhance.pdf")
 
+# Figura terciaria: como la principal (una fila por tarea) pero incluyendo el
+# modelo mono-tarea sobre las cinco tareas; muestra cómo el especialista en
+# enhance se degrada fuera de su tarea de entrenamiento.
+OUT_FIG_ALL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
+                           "fig_qualitative_all.pdf")
+
+# Si False, una figura que ya existe como figura REAL (no plantilla) no se
+# regenera, evitando recomputar predicciones y reescribir el PDF. Poner True
+# (o borrar el PDF) para forzar la regeneración.
+OVERWRITE_FIGS = False
+
 _MODEL_CONFIGS = {
     "variant": "", "dropout_rate": 0.1, "num_outputs": 3,
     "use_bias": True, "num_supervision_scales": 3,
@@ -313,6 +324,14 @@ def evaluate_checkpoint(label, kind, variant, ckpt_dir, batch=4):
     return psnr, ssim, (model, state, kind)
 
 
+def _figure_up_to_date(out_path):
+    """True si ya hay una figura REAL (no plantilla) en out_path: existe el PDF
+    y NO existe su marca .{stem}_is_placeholder (la que deja make_figs.py)."""
+    stem = os.path.splitext(os.path.basename(out_path))[0]
+    flag = os.path.join(os.path.dirname(out_path), f".{stem}_is_placeholder")
+    return os.path.exists(out_path) and not os.path.exists(flag)
+
+
 def _render_qualitative(models, model_labels, tasks, out_path):
     """Renderiza una grilla cualitativa y la guarda en out_path.
 
@@ -320,11 +339,17 @@ def _render_qualitative(models, model_labels, tasks, out_path):
     etiqueta de `model_labels` presente en `models` + Referencia. Devuelve True
     si escribió la figura.
     """
+    name = os.path.basename(out_path)
+    # Verificación previa: no recomputar/reescribir si ya hay una figura real.
+    if not OVERWRITE_FIGS and _figure_up_to_date(out_path):
+        log(f"  {name}: ya existe una figura real; se omite "
+            f"(OVERWRITE_FIGS=True o borrar el PDF para regenerar).")
+        return False
+
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    name = os.path.basename(out_path)
     model_cols = [lbl for lbl in model_labels if lbl in models]
     if not model_cols:
         log(f"[aviso] sin modelos disponibles para {name}; se omite.")
@@ -392,6 +417,16 @@ def make_qualitative_enhance(models):
                         [QUALITATIVE_ENHANCE_TASK], OUT_FIG_ENHANCE)
 
 
+def make_qualitative_all(models):
+    """Figura terciaria (fig_qualitative_all.pdf): como la principal (una fila
+    por tarea) pero incluyendo el modelo mono-tarea en todas las tareas, junto a
+    multi-tarea y MoE. Evidencia la degradación del especialista en enhance
+    fuera de su tarea."""
+    _render_qualitative(models,
+                        [QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE],
+                        TASKS, OUT_FIG_ALL)
+
+
 def main():
     log(f"Evaluando {len(CHECKPOINTS)} checkpoints sobre {len(TASKS)} tareas.")
     log(f"DATA_ROOT = {DATA_ROOT}")
@@ -421,6 +456,7 @@ def main():
            (QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE)):
         make_qualitative(models)
         make_qualitative_enhance(models)
+        make_qualitative_all(models)
     else:
         log("\n[aviso] faltan checkpoints para la figura cualitativa.")
 
