@@ -43,7 +43,7 @@
 \usepackage{amssymb}
 \usepackage{amsmath}
 \usepackage{color}
-\usepackage{hyperref}
+\usepackage[hidelinks]{hyperref}
 %\usepackage[percent]{overpic}
 \usepackage{tikz}
 \usepackage{mathrsfs}
@@ -269,19 +269,21 @@ La Tabla~\ref{tab:cuant} resume el desempeño de las cuatro configuraciones, y l
 
 La variante MAXIM+MoE presenta un comportamiento marcadamente distinto. Tras una mejora inicial muy rápida durante las primeras tres épocas ---en las que pasa de $\sim\!10{,}5$ a $\sim\!12{,}3$~dB---, la PSNR de validación se estanca y oscila en torno a $12{,}5$--$12{,}7$~dB sin progreso apreciable. El mejor \textit{checkpoint} alcanza $12{,}7$~dB. La comparación decisiva es con la versión multi-tarea desde cero: con idéntica escala (S-2), idéntica inicialización aleatoria, el mismo conjunto de entrenamiento y validación y el mismo presupuesto de $30$ épocas, esa versión sin MoE alcanza $24{,}8$~dB, es decir, unos $12$~dB por encima. Prolongar el entrenamiento de la variante MoE más allá de las $60$ épocas no modificó su estancamiento, lo que descarta un presupuesto de cómputo insuficiente.
 
-\begin{table}[ht]
-\caption{\label{tab:cuant}Comparación cuantitativa sobre el conjunto de validación (parches de $256\times 256$). Se reporta la mejor PSNR alcanzada, la SSIM asociada y la pérdida L1 de validación. ``Escala'' indica la variante de MAXIM (S-2 o S-3, según el número de etapas); ``Inic.'' la inicialización (aleatoria o desde \textit{checkpoint} preentrenado) y ``Sup.'' el tipo de supervisión (multi-escala o de una sola escala). Los valores de SSIM, marcados con ``---'', se obtienen ejecutando el \textit{script} de evaluación \texttt{eval\_metrics.py} sobre los \textit{checkpoints} guardados.}
+\begin{table*}[ht]
+\caption{\label{tab:cuant}Comparación cuantitativa sobre el conjunto de validación (parches de $256\times 256$). Se reporta la mejor PSNR alcanzada, la SSIM asociada y la pérdida L1 de validación. ``Escala'' indica la variante de MAXIM (S-2 o S-3, según el número de etapas); ``Inic.'' la inicialización (aleatoria o desde \textit{checkpoint} preentrenado) y ``Sup.'' el tipo de supervisión (multi-escala o de una sola escala). La SSIM se calcula a posteriori con el mejor \textit{checkpoint} de cada configuración, sobre una submuestra aleatoria uniforme de hasta $200$ imágenes por tarea del conjunto de validación, con recorte central de $256\times 256$.}
 \begin{ruledtabular}
 \begin{tabular}{lcccccc}
 Modelo & Escala & Inic. & Sup. & PSNR (dB) & SSIM & L1 val. \\
 \hline
-MAXIM mono-tarea   & S-2 & aleat.   & multi  & $23{,}1$ & --- & $0{,}068$ \\
-MAXIM multi-tarea  & S-3 & preentr. & multi  & $\mathbf{25{,}5}$ & --- & $\mathbf{0{,}042}$ \\
-MAXIM multi-tarea  & S-2 & aleat.   & multi  & $24{,}8$ & --- & $0{,}046$ \\
-MAXIM+MoE          & S-2 & aleat.   & simple & $12{,}7$ & --- & $0{,}193$ \\
+MAXIM mono-tarea\footnotemark[1]   & S-2 & aleat.   & multi  & $23{,}1$ & $0{,}872$ & $0{,}068$ \\
+MAXIM multi-tarea  & S-3 & preentr. & multi  & $\mathbf{25{,}5}$ & $\mathbf{0{,}823}$ & $\mathbf{0{,}042}$ \\
+MAXIM multi-tarea  & S-2 & aleat.   & multi  & $24{,}8$ & ---\footnotemark[2] & $0{,}046$ \\
+MAXIM+MoE          & S-2 & aleat.   & simple & $12{,}7$ & $0{,}459$ & $0{,}193$ \\
 \end{tabular}
 \end{ruledtabular}
-\end{table}
+\footnotetext[1]{El modelo mono-tarea se valida únicamente sobre su tarea de entrenamiento (\textit{enhance}); su PSNR y SSIM no son directamente comparables con las filas multi-tarea.}
+\footnotetext[2]{\textit{Checkpoint} aún no incluido en la evaluación a posteriori de SSIM.}
+\end{table*}
 
 \begin{figure}[t]
 \centering
@@ -310,16 +312,16 @@ La Fig.~\ref{fig:cualit} contrasta reconstrucciones sobre muestras representativ
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig_qualitative.pdf}
-\caption{\label{fig:cualit}Comparación cualitativa sobre muestras de validación de distintas tareas. De izquierda a derecha: entrada degradada, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia. La figura se genera con el \textit{script} \texttt{eval\_metrics.py} a partir de los \textit{checkpoints} guardados.}
+\caption{\label{fig:cualit}Comparación cualitativa sobre muestras de validación de distintas tareas. De izquierda a derecha: entrada degradada, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia.}
 \end{figure}
 
 El modelo mono-tarea se omite de la Fig.~\ref{fig:cualit} porque, al estar especializado únicamente en la tarea \textit{enhance}, su reconstrucción carece de sentido sobre las demás degradaciones. Para una comparación justa, la Fig.~\ref{fig:cualit_enh} restringe el contraste a esa tarea e incorpora su salida junto a las del modelo multi-tarea y la variante MAXIM+MoE. Sobre su tarea de entrenamiento, el especialista mono-tarea produce una reconstrucción al nivel del modelo multi-tarea, mientras que la variante MoE conserva el deterioro observado en el resto de las tareas.
 
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\columnwidth]{figs/fig_qualitative_enhance.pdf}
-\caption{\label{fig:cualit_enh}Comparación cualitativa sobre la tarea \textit{enhance}, la única en la que el modelo mono-tarea es directamente comparable. De izquierda a derecha: entrada degradada, MAXIM mono-tarea, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia. La figura se genera con el \textit{script} \texttt{eval\_metrics.py} a partir de los \textit{checkpoints} guardados.}
-\end{figure}
+\includegraphics[width=0.85\textwidth]{figs/fig_qualitative_enhance.pdf}
+\caption{\label{fig:cualit_enh}Comparación cualitativa sobre la tarea \textit{enhance}, la única en la que el modelo mono-tarea es directamente comparable. De izquierda a derecha: entrada degradada, MAXIM mono-tarea, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia.}
+\end{figure*}
 
 \section{Discusión}
 
