@@ -18,7 +18,7 @@ CKPT_PATH = "./ckpts/maxim_ckpt_Deblurring_GoPro_checkpoint.npz"
 TASK = "deblur"
 _MODEL_CONFIGS = {
     "variant": "",
-    "dropout_rate": 0.0,
+    "dropout_rate": 0.1,
     "num_outputs": 3,
     "use_bias": True,
     "num_supervision_scales": 3,

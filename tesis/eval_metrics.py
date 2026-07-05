@@ -68,6 +68,8 @@ TASKS = ["deblur", "dehaze", "denoise", "derain", "enhance"]
 CHECKPOINTS = [
     ("MAXIM mono-tarea",  "base", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/single_task_enhance/best_checkpoint/checkpoint_29"),
     ("MAXIM multi-tarea", "base", "S-3", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/multi_task_all/best_checkpoint/checkpoint_29"),
+    # VERIFICAR ruta: mejor época 27 según no_moe_outputs/multi_task_scratch.txt.
+    ("MAXIM multi-tarea (desde cero)", "base", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/multi_task_all_S-2_scratch/best_checkpoint/checkpoint_27"),
     ("MAXIM+MoE",         "moe",  "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/moe_training/best_checkpoint/checkpoint_41"),
 ]
 
