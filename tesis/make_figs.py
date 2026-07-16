@@ -112,7 +112,12 @@ def series(d, key):
 # ---------------------------------------------------------------------------
 # Load data
 # ---------------------------------------------------------------------------
-moe_tr, moe_va = parse_moe(os.path.join(ROOT, "moe_outputs", "training_outs_2.txt"))
+# MoE: corrida 2026-07 desde cero (S-2, random init) con el random_crop corregido.
+# La corrida vieja (moe_outputs/training_outs_2.txt) entrenaba contra parches
+# desalineados y quedo obsoleta.
+moe_tr, moe_va = parse_moe(os.path.join(ROOT, "moe_outputs", "multi_task_scratch.txt"))
+# single_task.txt concatena varios intentos (1-21, 1-15 y la corrida final 1-30);
+# el parser guarda la ULTIMA ocurrencia de cada epoca, que es la corrida completa.
 st_tr, st_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "single_task.txt"))
 mt_tr, mt_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "multi_task.txt"))
 # Fair comparison: multi-task, S-2 backbone, random init (same scale + init as the MoE).
@@ -161,36 +166,38 @@ def fig_val_psnr():
     ax.set_xlabel("Época")
     ax.set_ylabel("PSNR de validación (dB)")
     ax.set_xlim(1, EMAX)
-    ax.set_ylim(9, 27)
+    ax.set_ylim(12, 27)
     ax.grid(True, linestyle="--")
-    # Anchored in the empty band between the MoE plateau (~12.7 dB) and the
-    # mono-task curve (>20 dB) so no curve passes behind the legend.
-    ax.legend(loc="center right", bbox_to_anchor=(1.0, 0.38),
-              frameon=True, framealpha=0.88, edgecolor="none",
+    # All curves climb above ~19 dB after the first epochs, so the lower-right
+    # region stays empty for the legend.
+    ax.legend(loc="lower right", frameon=True, framealpha=0.88, edgecolor="none",
               handlelength=1.6, fontsize=7.0)
     fig.savefig(os.path.join(OUT, "fig_val_psnr.pdf"))
     plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
-# Figure 2 — MoE dynamics: (a) train/val PSNR plateau, (b) router collapse
+# Figure 2 — MoE dynamics: (a) train/val PSNR convergence, (b) uniform routing
 # ---------------------------------------------------------------------------
 def fig_moe_dynamics():
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(7.0, 2.7))
 
-    # (a) PSNR plateau over the full 62-epoch run
+    # (a) PSNR convergence over the 30-epoch run (fixed random_crop)
     ep, tr = series(moe_tr, "psnr")
     epv, va = series(moe_va, "psnr")
     axL.plot(ep, tr, color=C_MOE, label="Entrenamiento")
     axL.plot(epv, va, color=C_MULTI, label="Validación")
     axL.set_xlabel("Época")
     axL.set_ylabel("PSNR (dB)")
-    axL.set_ylim(9, 14)
+    axL.set_ylim(2, 25)
     axL.grid(True, linestyle="--")
     axL.legend(loc="lower right", frameon=False, handlelength=1.6)
     axL.set_title("(a) PSNR del modelo MoE", fontsize=9)
 
-    # (b) router entropy and balance -> collapse to the uniform regime
+    # (b) router entropy and balance stay pinned at the uniform regime.
+    # Zoomed axes: entropy moves within [1.600, 1.609] (max ln 5 = 1.6094) and
+    # balance within [1.001, 1.010] (min 1.0), so a full-range axis would show
+    # two flat lines.
     ep, ent = series(moe_tr, "entropy")
     _, bal = series(moe_tr, "balance")
     axR.plot(ep, ent, color=C_MOE, label="Entropía del ruteador")
@@ -198,7 +205,7 @@ def fig_moe_dynamics():
                 label=r"$\ln K$ (máx., uniforme)")
     axR.set_xlabel("Época")
     axR.set_ylabel("Entropía (nats)")
-    axR.set_ylim(1.0, 1.7)
+    axR.set_ylim(1.55, 1.62)
     axR.grid(True, linestyle="--")
     axR.set_title("(b) Diagnóstico del ruteador", fontsize=9)
 
@@ -207,7 +214,7 @@ def fig_moe_dynamics():
     axR2.axhline(1.0, color=C_SINGLE, linestyle=":", linewidth=0.8, alpha=0.6)
     axR2.set_ylabel("Balance de carga", color=C_SINGLE)
     axR2.tick_params(axis="y", labelcolor=C_SINGLE)
-    axR2.set_ylim(0.98, 2.05)
+    axR2.set_ylim(0.99, 1.06)
 
     # merged legend for panel (b)
     h1, l1 = axR.get_legend_handles_labels()

@@ -66,17 +66,21 @@ TASKS = ["deblur", "dehaze", "denoise", "derain", "enhance"]
 #   tipo: "base"  -> MAXIM sin MoE (mono o multi)
 #         "moe"   -> variante MAXIM+MoE
 CHECKPOINTS = [
-    ("MAXIM mono-tarea",  "base", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/single_task_enhance/best_checkpoint/checkpoint_29"),
-    ("MAXIM multi-tarea", "base", "S-3", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/multi_task_all/best_checkpoint/checkpoint_29"),
-    # VERIFICAR ruta: mejor época 27 según no_moe_outputs/multi_task_scratch.txt.
-    ("MAXIM multi-tarea (desde cero)", "base", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/multi_task_all_S-2_scratch/best_checkpoint/checkpoint_27"),
-    ("MAXIM+MoE",         "moe",  "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/moe_training/best_checkpoint/checkpoint_41"),
+    # VERIFICAR ruta: la nueva corrida single-task (log 2026-07) tiene su mejor
+    # epoca en la 28 (23.97 dB), no en la 29.
+    ("MAXIM single-task enhance",  "base", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/single_task_enhance/best_checkpoint/checkpoint_28"),
+    ("MAXIM multi-task warm", "base", "S-3", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/multi_task_all/best_checkpoint/checkpoint_29"),
+    ("MAXIM multi-task scratch", "base", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/maxim_no_moe/multi_task_all_S-2_scratch/best_checkpoint/checkpoint_27"),
+    ("MAXIM+MoE", "moe", "S-2", "/content/gdrive/MyDrive/Facultad/tesis/ckpts/moe_training_scratch/best_checkpoint/checkpoint_29"),
 ]
 
 # La figura cualitativa contrasta estos modelos (por etiqueta) contra la GT.
-# El orden aquí es el orden de las columnas en la figura.
-QUALITATIVE_MONO = "MAXIM mono-tarea"
-QUALITATIVE_BASELINE = "MAXIM multi-tarea"
+# El orden aquí es el orden de las columnas en la figura. Deben coincidir con
+# las etiquetas de CHECKPOINTS. Baseline = multi-task desde cero (S-2): la
+# comparación justa contra el MoE; cambiar a "MAXIM multi-task warm" para usar
+# la referencia preentrenada (S-3).
+QUALITATIVE_MONO = "MAXIM single-task enhance"
+QUALITATIVE_BASELINE = "MAXIM multi-task scratch"
 QUALITATIVE_MOE = "MAXIM+MoE"
 
 # Figura principal: una fila por tarea, multi-tarea vs MoE (sin el modelo
@@ -84,9 +88,13 @@ QUALITATIVE_MOE = "MAXIM+MoE"
 OUT_FIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
                        "fig_qualitative.pdf")
 
-# Figura secundaria: una sola fila (tarea enhance) que sí incluye el modelo
-# mono-tarea, comparándolo de forma justa con multi-tarea y MoE en su tarea.
+# Figura secundaria: varias filas de la tarea enhance; incluye el modelo
+# mono-tarea y lo compara de forma justa con multi-tarea y MoE en su tarea.
 QUALITATIVE_ENHANCE_TASK = "enhance"
+# Cantidad de ejemplos de enhance que se muestran (una fila por imagen).
+# iter_val_pairs los selecciona aleatoriamente con SEED, por lo que la figura
+# es reproducible entre ejecuciones.
+QUALITATIVE_ENHANCE_EXAMPLES = 4
 OUT_FIG_ENHANCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
                                "fig_qualitative_enhance.pdf")
 
@@ -99,7 +107,9 @@ OUT_FIG_ALL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
 # Si False, una figura que ya existe como figura REAL (no plantilla) no se
 # regenera, evitando recomputar predicciones y reescribir el PDF. Poner True
 # (o borrar el PDF) para forzar la regeneración.
-OVERWRITE_FIGS = False
+# True: las figuras existentes salen de la corrida MoE vieja (random_crop
+# desalineado) y DEBEN regenerarse con los checkpoints nuevos.
+OVERWRITE_FIGS = True
 
 _MODEL_CONFIGS = {
     "variant": "", "dropout_rate": 0.1, "num_outputs": 3,
@@ -259,7 +269,17 @@ def _build_state(kind, variant):
 
 def _restore(state, ckpt_dir):
     from flax.training import checkpoints
-    return checkpoints.restore_checkpoint(ckpt_dir=ckpt_dir, target=state)
+    # restore_checkpoint NO lanza excepción si la ruta no existe: devuelve el
+    # target intacto y se evaluaría un modelo ALEATORIO. Detectamos ese caso
+    # comparando el contador de pasos del optimizador.
+    step_before = int(state.step)
+    restored = checkpoints.restore_checkpoint(ckpt_dir=ckpt_dir, target=state)
+    if int(restored.step) == step_before:
+        raise FileNotFoundError(
+            f"restore_checkpoint no cargó nada desde {ckpt_dir} "
+            f"(state.step sigue en {step_before}); revisar la ruta en CHECKPOINTS."
+        )
+    return restored
 
 
 def _predict(kind, model, state, x_nhwc):
@@ -334,12 +354,13 @@ def _figure_up_to_date(out_path):
     return os.path.exists(out_path) and not os.path.exists(flag)
 
 
-def _render_qualitative(models, model_labels, tasks, out_path):
+def _render_qualitative(models, model_labels, tasks, out_path,
+                        examples_per_task=1):
     """Renderiza una grilla cualitativa y la guarda en out_path.
 
-    Una fila por tarea en `tasks`; columnas = Entrada + un modelo por cada
-    etiqueta de `model_labels` presente en `models` + Referencia. Devuelve True
-    si escribió la figura.
+    Genera `examples_per_task` filas por cada tarea en `tasks`; columnas =
+    Entrada + un modelo por cada etiqueta de `model_labels` presente en
+    `models` + Referencia. Devuelve True si escribió la figura.
     """
     name = os.path.basename(out_path)
     # Verificación previa: no recomputar/reescribir si ya hay una figura real.
@@ -360,15 +381,18 @@ def _render_qualitative(models, model_labels, tasks, out_path):
     ncols = len(col_titles)
 
     rows = []
-    log(f"\nGenerando {name} ({len(tasks)} fila(s); columnas: "
+    expected_rows = len(tasks) * examples_per_task
+    log(f"\nGenerando {name} (hasta {expected_rows} fila(s); columnas: "
         f"{', '.join(model_cols)})...")
     for task in tasks:
-        for x, y in iter_val_pairs(task, limit=1):
+        for example_idx, (x, y) in enumerate(
+                iter_val_pairs(task, limit=examples_per_task), start=1):
             preds = [_predict(models[lbl][2], models[lbl][0], models[lbl][1], x[None])[0]
                      for lbl in model_cols]
-            rows.append((task, x, preds, y))
-            log(f"  fila {task} lista.")
-            break
+            row_label = (task if examples_per_task == 1
+                         else f"{task} {example_idx}")
+            rows.append((row_label, x, preds, y))
+            log(f"  fila {row_label} lista.")
     if not rows:
         log(f"[aviso] sin imágenes para {name}; se omite.")
         return False
@@ -410,13 +434,14 @@ def make_qualitative(models):
 
 
 def make_qualitative_enhance(models):
-    """Figura secundaria (fig_qualitative_enhance.pdf): una sola fila para la
+    """Figura secundaria (fig_qualitative_enhance.pdf): varias filas para la
     tarea enhance, comparando mono-tarea vs multi-tarea vs MoE contra la GT.
     Aquí el modelo mono-tarea (single_task_enhance) sí es comparable, porque es
     su tarea de entrenamiento."""
     _render_qualitative(models,
                         [QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE],
-                        [QUALITATIVE_ENHANCE_TASK], OUT_FIG_ENHANCE)
+                        [QUALITATIVE_ENHANCE_TASK], OUT_FIG_ENHANCE,
+                        examples_per_task=QUALITATIVE_ENHANCE_EXAMPLES)
 
 
 def make_qualitative_all(models):
