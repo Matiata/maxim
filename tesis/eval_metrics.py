@@ -83,6 +83,16 @@ QUALITATIVE_MONO = "MAXIM single-task enhance"
 QUALITATIVE_BASELINE = "MAXIM multi-task scratch"
 QUALITATIVE_MOE = "MAXIM+MoE"
 
+# Nombres en español para los títulos de columna de las figuras (las
+# etiquetas de arriba se mantienen en inglés porque son claves internas,
+# usadas también en CHECKPOINTS y en los logs).
+DISPLAY_NAMES = {
+    "MAXIM single-task enhance": "MAXIM mono-tarea",
+    "MAXIM multi-task warm": "MAXIM multi-tarea (preentr.)",
+    "MAXIM multi-task scratch": "MAXIM multi-tarea",
+    "MAXIM+MoE": "MAXIM+MoE",
+}
+
 # Figura principal: una fila por tarea, multi-tarea vs MoE (sin el modelo
 # mono-tarea, que solo es especialista en enhance y bajaría en las demás filas).
 OUT_FIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
@@ -97,12 +107,6 @@ QUALITATIVE_ENHANCE_TASK = "enhance"
 QUALITATIVE_ENHANCE_EXAMPLES = 4
 OUT_FIG_ENHANCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
                                "fig_qualitative_enhance.pdf")
-
-# Figura terciaria: como la principal (una fila por tarea) pero incluyendo el
-# modelo mono-tarea sobre las cinco tareas; muestra cómo el especialista en
-# enhance se degrada fuera de su tarea de entrenamiento.
-OUT_FIG_ALL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "figs",
-                           "fig_qualitative_all.pdf")
 
 # Si False, una figura que ya existe como figura REAL (no plantilla) no se
 # regenera, evitando recomputar predicciones y reescribir el PDF. Poner True
@@ -377,7 +381,9 @@ def _render_qualitative(models, model_labels, tasks, out_path,
     if not model_cols:
         log(f"[aviso] sin modelos disponibles para {name}; se omite.")
         return False
-    col_titles = ["Entrada (degradada)"] + model_cols + ["Referencia"]
+    col_titles = (["Entrada (degradada)"]
+                  + [DISPLAY_NAMES.get(lbl, lbl) for lbl in model_cols]
+                  + ["Referencia"])
     ncols = len(col_titles)
 
     rows = []
@@ -444,16 +450,6 @@ def make_qualitative_enhance(models):
                         examples_per_task=QUALITATIVE_ENHANCE_EXAMPLES)
 
 
-def make_qualitative_all(models):
-    """Figura terciaria (fig_qualitative_all.pdf): como la principal (una fila
-    por tarea) pero incluyendo el modelo mono-tarea en todas las tareas, junto a
-    multi-tarea y MoE. Evidencia la degradación del especialista en enhance
-    fuera de su tarea."""
-    _render_qualitative(models,
-                        [QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE],
-                        TASKS, OUT_FIG_ALL)
-
-
 def main():
     log(f"Evaluando {len(CHECKPOINTS)} checkpoints sobre {len(TASKS)} tareas.")
     log(f"DATA_ROOT = {DATA_ROOT}")
@@ -483,7 +479,6 @@ def main():
            (QUALITATIVE_MONO, QUALITATIVE_BASELINE, QUALITATIVE_MOE)):
         make_qualitative(models)
         make_qualitative_enhance(models)
-        make_qualitative_all(models)
     else:
         log("\n[aviso] faltan checkpoints para la figura cualitativa.")
 
