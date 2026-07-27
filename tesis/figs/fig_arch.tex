@@ -1,0 +1,114 @@
+% =====================================================================
+%  fig_arch.tex  --  Vista general de la arquitectura MAXIM+MoE
+%
+%  Uso en main.tex (dentro de un figure*):   \input{figs/fig_arch}
+%
+%  REQUIERE en el preámbulo:
+%     \usepackage{tikz}
+%     \usetikzlibrary{arrows.meta,positioning,calc,fit}
+%
+%  Vista previa aislada: compilar figs/fig_arch_standalone.tex
+% =====================================================================
+
+% --- miniatura de imagen (placeholder dibujado) ----------------------
+% Para usar imágenes reales, reemplazar el cuerpo por:
+%   \node[inner sep=0pt] (#1) at #2 {\includegraphics[width=10mm]{archivo}};
+\providecommand{\imgnode}[3]{%
+  \node[draw=black!55,line width=.4pt,minimum size=10mm,inner sep=0pt,fill=#3] (#1) at #2 {};
+  \begin{scope}
+    \clip ([xshift=.5pt,yshift=.5pt]#1.south west) rectangle ([xshift=-.5pt,yshift=-.5pt]#1.north east);
+    \fill[green!35!black!55] (#1.south west) rectangle ([yshift=3.2mm]#1.south east);
+    \fill[yellow!75!orange]  ([shift={(-2.7mm,-2.7mm)}]#1.north east) circle (1.1mm);
+    \draw[white!80!black,line width=.4pt]
+      ([yshift=3.2mm]#1.south west) -- ([shift={(2.1mm,5.6mm)}]#1.south west)
+      -- ([shift={(4.6mm,3.2mm)}]#1.south west);
+  \end{scope}
+}
+
+% --- estilos (definidos al nivel superior, con prefijo m-) -----------
+% Se redefinen sin problema si este archivo se incluye junto a fig_moehead.tex.
+\tikzset{mblk/.style={draw,rounded corners=1.5pt,minimum height=5.5mm,
+                      minimum width=12mm,align=center,inner sep=1.2pt,line width=.4pt}}
+\tikzset{menc/.style={mblk,fill=blue!10,draw=blue!60!black}}
+\tikzset{mdec/.style={mblk,fill=green!14,draw=green!45!black}}
+\tikzset{mbot/.style={mblk,fill=orange!20,draw=orange!70!black}}
+\tikzset{mcgb/.style={mblk,fill=red!12,draw=red!60!black,minimum width=9mm}}
+\tikzset{mrt/.style={mblk,fill=violet!12,draw=violet!65!black,minimum width=20mm}}
+\tikzset{mex/.style={mblk,fill=yellow!28,draw=olive!80!black,minimum width=15mm}}
+\tikzset{mgrp/.style={draw=black!45,dashed,rounded corners=3pt,line width=.4pt}}
+\tikzset{mop/.style={draw,circle,minimum size=3.6mm,inner sep=0pt,line width=.4pt}}
+\tikzset{mar/.style={->,line width=.45pt}}
+\tikzset{mgate/.style={->,line width=.45pt,densely dashed,draw=violet!70!black}}
+\tikzset{mcap/.style={font=\scriptsize,align=center}}
+
+\begin{tikzpicture}[font=\scriptsize,>={Stealth[length=4pt,width=3pt]}]
+
+% --- entrada ---------------------------------------------------------
+\imgnode{xin}{(0,0)}{blue!14!gray!35}
+\node[mcap,below=1.2mm of xin] {$x$\\ \itshape degradada};
+
+% --- backbone MAXIM: glifo tipo U-Net --------------------------------
+\node[menc] (e1) at (2.35, 1.15) {Encoder};
+\node[menc] (e2) at (2.35, 0.35) {Encoder};
+\node[menc] (e3) at (2.35,-0.45) {Encoder};
+\node[mcgb] (c1) at (3.95, 1.15) {CGB};
+\node[mcgb] (c2) at (3.95, 0.35) {CGB};
+\node[mcgb] (c3) at (3.95,-0.45) {CGB};
+\node[mdec] (d1) at (5.55, 1.15) {Decoder};
+\node[mdec] (d2) at (5.55, 0.35) {Decoder};
+\node[mdec] (d3) at (5.55,-0.45) {Decoder};
+\node[mbot] (bn) at (3.95,-1.25) {Bottleneck};
+
+\draw[mar] (e1) -- node[right,pos=.42,font=\tiny,inner sep=1pt] {$\downarrow$2} (e2);
+\draw[mar] (e2) -- node[right,pos=.42,font=\tiny,inner sep=1pt] {$\downarrow$2} (e3);
+\draw[mar] (e3.south) |- (bn.west);
+\draw[mar] (bn.east) -| (d3.south);
+\draw[mar] (d3) -- node[right,pos=.42,font=\tiny,inner sep=1pt] {$\uparrow$2} (d2);
+\draw[mar] (d2) -- node[right,pos=.42,font=\tiny,inner sep=1pt] {$\uparrow$2} (d1);
+
+% skips a través de los bloques de compuertas cruzadas
+\draw[mar] (e1) -- (c1);  \draw[mar] (c1) -- (d1);
+\draw[mar] (e2) -- (c2);  \draw[mar] (c2) -- (d2);
+\draw[mar] (e3) -- (c3);  \draw[mar] (c3) -- (d3);
+
+% features globales propagadas hacia arriba
+\draw[mar,draw=black!45] (bn.north) -- (c3.south);
+\draw[mar,draw=black!45] (c3) -- (c2);
+\draw[mar,draw=black!45] (c2) -- (c1);
+
+\node[mgrp,fit=(e1)(d1)(bn),inner sep=3.2mm] (bbox) {};
+\node[mcap,above=0.8mm of bbox.north]
+  {\textbf{Backbone MAXIM} ($\theta$), variante S-2, $\times 2$ etapas};
+\draw[mar] (xin.east) -- (bbox.west);
+
+% --- mapa de características -----------------------------------------
+\draw[fill=teal!8 ,draw=teal!60!black,line width=.4pt] (7.30,-0.55) rectangle (8.00,0.55);
+\draw[fill=teal!16,draw=teal!60!black,line width=.4pt] (7.45,-0.40) rectangle (8.15,0.70);
+\draw[fill=teal!26,draw=teal!60!black,line width=.4pt] (7.60,-0.25) rectangle (8.30,0.85);
+\coordinate (fmapW) at (7.30,0.15);
+\coordinate (fmapE) at (8.30,0.15);
+\node[mcap] at (7.80,-1.10) {$f_\theta(x)$\\ $H\!\times\!W\!\times\!C$};
+\draw[mar] (bbox.east) -- (fmapW);
+
+% --- cabezal MoE (resumido; el detalle está en la otra figura) --------
+\node[mblk,minimum width=23mm,minimum height=18mm,fill=yellow!14,draw=olive!80!black]
+  (moebox) at (10.2,0.15) {\textbf{MoE Header}\\ $K=5$ expertos $+$ router};
+\draw[mar] (fmapE) -- (moebox.west);
+
+% --- ruteador ---------------------------------------------------------
+\node[mrt,minimum width=34mm,minimum height=10mm] (rt) at (5.0,-2.60)
+  {Router $g_\phi$ \\ conv.\ separables $+$ MLP $\rightarrow$ softmax};
+\draw[mar] (xin.west) -- ++(-0.45,0) |- (rt.west);
+\draw[mgate] (rt.east) -| node[pos=.22,above,font=\tiny,inner sep=1.5pt] {$p(x)\in\Delta^{K-1}$} (moebox.south);
+
+% --- salida -----------------------------------------------------------
+\imgnode{yout}{(12.5,0.15)}{blue!25!white}
+\node[mcap,below=1.2mm of yout] {$\hat{y}$\\ \itshape restaurada};
+\draw[mar] (moebox.east) -- (yout.west);
+
+% --- conexión residual global -----------------------------------------
+\draw[mar,draw=black!55] (xin.north) -- (0,2.80) -- (12.5,2.80) -- (yout.north);
+\node[mcap,above=0.3mm] at (6.3,2.80)
+  {conexión residual:\; $\hat{y}=x+\sum_{k=1}^{K} p_k(x)\,E_k\!\big(f_\theta(x)\big)$};
+
+\end{tikzpicture}

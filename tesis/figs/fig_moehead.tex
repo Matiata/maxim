@@ -1,0 +1,101 @@
+% =====================================================================
+%  fig_moehead.tex  --  Detalle del cabezal MoE (ruteador + expertos)
+%
+%  Uso en main.tex (dentro de un figure*):  \input{figs/fig_moehead}
+%
+%  REQUIERE en el preámbulo:
+%     \usepackage{tikz}
+%     \usetikzlibrary{arrows.meta,positioning,calc,fit}
+%
+%  Es autocontenido: repite las mismas definiciones que fig_arch.tex.
+%  \providecommand y \tikzset son idempotentes, no hay conflicto.
+% =====================================================================
+
+\providecommand{\imgnode}[3]{%
+  \node[draw=black!55,line width=.4pt,minimum size=10mm,inner sep=0pt,fill=#3] (#1) at #2 {};
+  \begin{scope}
+    \clip ([xshift=.5pt,yshift=.5pt]#1.south west) rectangle ([xshift=-.5pt,yshift=-.5pt]#1.north east);
+    \fill[green!35!black!55] (#1.south west) rectangle ([yshift=3.2mm]#1.south east);
+    \fill[yellow!75!orange]  ([shift={(-2.7mm,-2.7mm)}]#1.north east) circle (1.1mm);
+    \draw[white!80!black,line width=.4pt]
+      ([yshift=3.2mm]#1.south west) -- ([shift={(2.1mm,5.6mm)}]#1.south west)
+      -- ([shift={(4.6mm,3.2mm)}]#1.south west);
+  \end{scope}
+}
+
+\tikzset{mblk/.style={draw,rounded corners=1.5pt,minimum height=5.5mm,
+                      minimum width=12mm,align=center,inner sep=1.2pt,line width=.4pt}}
+\tikzset{menc/.style={mblk,fill=blue!10,draw=blue!60!black}}
+\tikzset{mdec/.style={mblk,fill=green!14,draw=green!45!black}}
+\tikzset{mbot/.style={mblk,fill=orange!20,draw=orange!70!black}}
+\tikzset{mcgb/.style={mblk,fill=red!12,draw=red!60!black,minimum width=9mm}}
+\tikzset{mrt/.style={mblk,fill=violet!12,draw=violet!65!black,minimum width=20mm}}
+\tikzset{mex/.style={mblk,fill=yellow!28,draw=olive!80!black,minimum width=15mm}}
+\tikzset{mgrp/.style={draw=black!45,dashed,rounded corners=3pt,line width=.4pt}}
+\tikzset{mop/.style={draw,circle,minimum size=3.6mm,inner sep=0pt,line width=.4pt}}
+\tikzset{mar/.style={->,line width=.45pt}}
+\tikzset{mgate/.style={->,line width=.45pt,densely dashed,draw=violet!70!black}}
+\tikzset{mcap/.style={font=\scriptsize,align=center}}
+
+\begin{tikzpicture}[font=\scriptsize,>={Stealth[length=4pt,width=3pt]}]
+
+% --- rama del ruteador ------------------------------------------------
+% Encadenados con `positioning`: así nunca se solapan, sea cual sea el
+% ancho del texto de cada caja.
+\node[mcap] (xr) at (0.30,2.90) {$x$};
+\node[mrt,right=4mm of xr]  (r1) {Conv.\ separables\\ (4 bloques) $+$ GAP};
+\node[mrt,right=4mm of r1]  (r2) {MLP $576\!\rightarrow\!256\!\rightarrow\!128\!\rightarrow\!K$};
+\node[mrt,fill=violet!22,right=4mm of r2] (r3)
+  {softmax$(\,\cdot\,/\tau)$\\ $\tau=1{,}5$ entren.\ / $1{,}0$ eval.};
+\draw[mar] (xr) -- (r1);
+\draw[mar] (r1) -- (r2);
+\draw[mar] (r2) -- (r3);
+\node[mgrp,draw=violet!55,fit=(r1)(r3),inner sep=2.6mm] (rbox) {};
+\node[mcap,anchor=west,font=\scriptsize\itshape] at ([xshift=1.2mm]rbox.east) {$p(x)$};
+
+% --- mapa de características de entrada -------------------------------
+\draw[fill=teal!8 ,draw=teal!60!black,line width=.4pt] (0.10,-0.55) rectangle (0.80,0.55);
+\draw[fill=teal!16,draw=teal!60!black,line width=.4pt] (0.25,-0.40) rectangle (0.95,0.70);
+\draw[fill=teal!26,draw=teal!60!black,line width=.4pt] (0.40,-0.25) rectangle (1.10,0.85);
+\coordinate (fE) at (1.10,0.15);
+\node[mcap] at (0.60,-1.05) {$f_\theta(x)$};
+
+% --- cabezas expertas --------------------------------------------------
+\node[mex] (E1) at (3.10, 1.60) {$E_1$: Conv $3\!\times\!3$};
+\node[mex] (E2) at (3.10, 0.80) {$E_2$: Conv $3\!\times\!3$};
+\node[mex] (E3) at (3.10, 0.00) {$E_3$: Conv $3\!\times\!3$};
+\node[mex] (E4) at (3.10,-0.80) {$E_4$: Conv $3\!\times\!3$};
+\node[mex] (E5) at (3.10,-1.60) {$E_5$: Conv $3\!\times\!3$};
+\node[mcap,anchor=north] at (3.10,-2.00) {cada $E_k$: $C \rightarrow 3$ canales (RGB)};
+\foreach \k in {1,2,3,4,5}{\draw[mar] (fE) -- (E\k.west);}
+
+% --- ponderación por el peso de compuerta ------------------------------
+\node[mop] (M1) at (5.30, 1.60) {$\times$};
+\node[mop] (M2) at (5.30, 0.80) {$\times$};
+\node[mop] (M3) at (5.30, 0.00) {$\times$};
+\node[mop] (M4) at (5.30,-0.80) {$\times$};
+\node[mop] (M5) at (5.30,-1.60) {$\times$};
+\foreach \k in {1,2,3,4,5}{\draw[mar] (E\k.east) -- (M\k.west);}
+
+% pesos de compuerta: curvas punteadas + etiqueta $p_k$ como nodo aparte,
+% para que no queden apiladas sobre las propias curvas.
+\foreach \k in {1,2,3,4,5}{%
+  \draw[mgate] (rbox.south) to[out=-90,in=45] (M\k.north east);
+  \node[font=\tiny,inner sep=1pt,above=0.4mm of M\k] {$p_\k$};
+}
+
+% --- suma ponderada, residual y salida ---------------------------------
+\node[mop] (SUM) at (7.20,0.00) {$\Sigma$};
+\foreach \k in {1,2,3,4,5}{\draw[mar] (M\k.east) -- (SUM);}
+\node[mop] (ADD) at (8.60,0.00) {$+$};
+\draw[mar] (SUM) -- (ADD);
+
+\draw[mar,draw=black!55] (0.60,-2.85) -- (8.60,-2.85) -- (ADD.south);
+\node[mcap,anchor=east] at (0.45,-2.85) {$x$};
+\node[mcap,above=0.3mm] at (4.40,-2.85) {conexión residual};
+
+\imgnode{yb}{(10.05,0.0)}{blue!25!white}
+\node[mcap,below=1.2mm of yb] {$\hat{y}$};
+\draw[mar] (ADD) -- (yb.west);
+
+\end{tikzpicture}

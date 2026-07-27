@@ -1,0 +1,13 @@
+% Vista previa aislada de los diagramas de arquitectura.
+% Compilar DESDE el directorio figs/:   pdflatex fig_arch_standalone.tex
+% Produce una página por figura, recortada al contenido.
+\documentclass[border=6pt]{standalone}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit}
+\begin{document}
+\input{fig_arch}
+\input{fig_moehead}
+\end{document}

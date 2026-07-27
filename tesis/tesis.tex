@@ -46,6 +46,7 @@
 \usepackage[hidelinks]{hyperref}
 %\usepackage[percent]{overpic}
 \usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit}
 \usepackage{mathrsfs}
 \usepackage{wasysym}
 \usepackage{tikz-cd}
@@ -55,6 +56,20 @@
 
 % so sections, subsections, etc. become numerated.
 \setcounter{secnumdepth}{3}
+
+% Parámetros de flotantes: los valores por defecto de LaTeX son muy
+% restrictivos y, con siete flotantes (varios a doble columna), hacían que
+% las figuras se acumularan y aparecieran varias páginas después del texto
+% que las cita. Para revertir, basta con borrar este bloque.
+\renewcommand{\topfraction}{0.9}        % máx. de página ocupable por flotantes arriba
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.07}      % mín. de texto exigido por página
+\renewcommand{\floatpagefraction}{0.75}
+\renewcommand{\dbltopfraction}{0.9}     % ídem, para flotantes a doble columna
+\renewcommand{\dblfloatpagefraction}{0.75}
+\setcounter{topnumber}{3}
+\setcounter{dbltopnumber}{3}
+\setcounter{totalnumber}{4}
 
 % Comandos proprios
 \DeclareMathOperator*{\argmax}{arg\,max}
@@ -206,18 +221,50 @@ Por ese motivo, el protocolo metodológico contempla estos criterios de balance 
 
 \subsection{Diseño del modelo}
 
-La arquitectura implementada se compone de tres partes:
+La arquitectura implementada (Fig.~\ref{fig:arch}) se compone de tres partes:
 \begin{itemize}
     \item un backbone MAXIM compartido, encargado de extraer representaciones latentes a partir de la imagen degradada;
     \item un módulo de ruteo, que a partir de la imagen de entrada estima una distribución de pesos sobre los expertos;
     \item un conjunto de $K$ cabezas expertas de salida, cada una encargada de la proyección desde la representación latente hacia la imagen restaurada.
 \end{itemize}
 
-Concretamente, el backbone produce el mapa de características de la última etapa del decodificador a resolución completa, $f_\theta(x)$. El ruteador es una red liviana independiente ---un pequeño backbone de convoluciones separables en profundidad seguido de un perceptrón multicapa--- que emite $K$ logits; sobre ellos se aplica \textit{softmax} con una temperatura de $1{,}5$ durante el entrenamiento y de $1{,}0$ en evaluación. Cada experto $E_k$ es una única convolución $3\times 3$ que mapea $f_\theta(x)$ a tres canales RGB. La salida es la combinación convexa de las cabezas (ruteo denso), a la que se suma la entrada como conexión residual,
+\begin{figure*}[t]
+\centering
+\input{figs/fig_arch}
+\caption{\label{fig:arch}Arquitectura MAXIM+MoE. El backbone MAXIM (variante S-2, dos
+etapas) se comparte entre las cinco tareas y produce, a resolución completa, el mapa
+latente $f_\theta(x)$; los bloques Encoder y Decoder se comunican por conexiones
+\textit{skip} moduladas por bloques de compuertas cruzadas (CGB), y las características
+globales del \textit{bottleneck} se propagan hacia arriba. En paralelo, un ruteador
+liviano $g_\phi$ estima, a partir de la imagen degradada $x$, una distribución $p(x)$
+sobre $K=5$ cabezas expertas de salida. La especialización se introduce únicamente en
+la etapa de reconstrucción ---los expertos no intervienen en la extracción de
+características---, de modo que no se replican los bloques globales del backbone, que
+son los más costosos en memoria. El detalle del cabezal se muestra en la
+Fig.~\ref{fig:moehead}.}
+\end{figure*}
+
+Concretamente, el backbone produce el mapa de características de la última etapa del decodificador a resolución completa, $f_\theta(x)$ (Fig.~\ref{fig:moehead}). El ruteador es una red liviana independiente ---un pequeño backbone de convoluciones separables en profundidad seguido de un perceptrón multicapa--- que emite $K$ logits; sobre ellos se aplica \textit{softmax} con una temperatura de $1{,}5$ durante el entrenamiento y de $1{,}0$ en evaluación. Cada experto $E_k$ es una única convolución $3\times 3$ que mapea $f_\theta(x)$ a tres canales RGB. La salida es la combinación convexa de las cabezas (ruteo denso), a la que se suma la entrada como conexión residual,
 \begin{equation}
 \hat{y} = x + \sum_{k=1}^{K} p_k(x)\, E_k\big(f_\theta(x)\big).
 \end{equation}
 Se utilizan $K=5$ expertos, en correspondencia nominal con las cinco tareas consideradas. Este diseño prioriza la eficiencia de memoria: los expertos añaden una cantidad de parámetros despreciable frente al backbone, de modo que la especialización se introduce sin duplicar las etapas más costosas del modelo.
+
+\begin{figure*}[t]
+\centering
+\input{figs/fig_moehead}
+\caption{\label{fig:moehead}Detalle del cabezal MoE. El ruteador $g_\phi$ es una red
+convolucional liviana e independiente del backbone: una convolución $3\times 3$ con paso
+$2$, cuatro bloques de convolución separable en profundidad, un promedio global (GAP)
+que colapsa el mapa de activaciones a un vector de $576$ componentes, y un perceptrón
+multicapa que emite $K$ logits; la compuerta se obtiene aplicando \textit{softmax} a
+temperatura $\tau$. Cada experto $E_k$ es una única convolución $3\times 3$ que proyecta
+$f_\theta(x)$ a tres canales RGB. El ruteo es \emph{denso}: las $K$ cabezas se evalúan
+siempre y se combinan de forma convexa con los pesos $p_k(x)$, y a la suma se le añade
+la entrada como conexión residual. Nótese que, al ser cada $E_k$ lineal, la combinación
+equivale exactamente a una única convolución de núcleo $\sum_k p_k(x)\,W_k$: la mezcla
+sólo puede expresar una familia de núcleos de dimensión $K$ condicionada a la entrada.}
+\end{figure*}
 
 \subsection{Datos y tareas}
 
@@ -316,6 +363,17 @@ Este patrón es coherente con la regularización empleada: tanto el premio a la 
 
 La Fig.~\ref{fig:cualit} contrasta reconstrucciones sobre muestras representativas de validación, ordenadas en columnas: la entrada degradada, la salida del modelo base multi-tarea desde cero (S-2, la comparación justa), la de la variante MAXIM+MoE y la imagen de referencia. La comparación visual es consistente con la evaluación por tarea: en las degradaciones donde ambos modelos son cuantitativamente parejos ---\textit{deblurring}, \textit{deraining}--- las reconstrucciones son muy similares, mientras que en las tareas donde el MoE queda por debajo ---realce, \textit{denoising}--- su salida se ve más apagada y con menor detalle fino que la del modelo base. Este comportamiento es el esperable de un ruteador que promedia de manera uniforme cinco cabezas equivalentes, en lugar de seleccionar una hipótesis de reconstrucción especializada para cada entrada.
 
+% NOTA: el figure* (doble columna) se declara ANTES que el figure de una
+% columna a propósito. Los flotantes a doble columna sólo pueden ir en la
+% banda superior de una página; si el figure de una columna reclama antes
+% la cabecera de la columna izquierda, el figure* queda diferido a la
+% página siguiente (que es lo que ocurría: Fig. de realce sola al final).
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{figs/fig_qualitative_enhance.pdf}
+\caption{\label{fig:cualit_enh}Comparación cualitativa sobre la tarea \textit{enhance}, la única en la que el modelo mono-tarea es directamente comparable. De izquierda a derecha: entrada degradada, MAXIM mono-tarea, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia.}
+\end{figure*}
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figs/fig_qualitative.pdf}
@@ -323,12 +381,6 @@ La Fig.~\ref{fig:cualit} contrasta reconstrucciones sobre muestras representativ
 \end{figure}
 
 El modelo mono-tarea se omite de la Fig.~\ref{fig:cualit} porque, al estar especializado únicamente en la tarea \textit{enhance}, su reconstrucción carece de sentido sobre las demás degradaciones. Para una comparación justa, la Fig.~\ref{fig:cualit_enh} restringe el contraste a esa tarea e incorpora su salida junto a las del modelo multi-tarea y la variante MAXIM+MoE. Sobre la tarea de realce, tanto el especialista mono-tarea como el modelo multi-tarea producen reconstrucciones fieles ($21{,}5$--$22{,}8$~dB), mientras que la variante MoE queda claramente por detrás ($15{,}3$~dB): es precisamente en esta tarea ---la que más se beneficiaría de una cabeza especializada--- donde la ausencia de especialización del ruteador resulta más costosa.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.85\textwidth]{figs/fig_qualitative_enhance.pdf}
-\caption{\label{fig:cualit_enh}Comparación cualitativa sobre la tarea \textit{enhance}, la única en la que el modelo mono-tarea es directamente comparable. De izquierda a derecha: entrada degradada, MAXIM mono-tarea, MAXIM multi-tarea, MAXIM+MoE e imagen de referencia.}
-\end{figure*}
 
 \section{Discusión}
 
@@ -368,8 +420,6 @@ El análisis sugiere intervenciones directas para una próxima iteración; las d
 \section{Agradecimientos}
 
 \begin{acknowledgments}
-MAM agradece a la UNC, en especial a los profesores Juan Ignacio Perotti, Francisco Tamarit y Benjamín Marcolongo
-por su esfuerzo y paciencia para dictar el curso de \textit{Redes Neuronales}.
 \end{acknowledgments}
 % Referencias.
 % Se incluyen en línea (entorno thebibliography) para que el documento compile
