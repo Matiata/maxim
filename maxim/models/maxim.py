@@ -642,6 +642,9 @@ class MAXIM(nn.Module):
      [output_stage2_scale1, output_stage2_scale2, output_stage2_scale3],
      [output_stage3_scale1, output_stage3_scale2, output_stage3_scale3],]
     The final output can be retrieved by outputs[-1][-1].
+    When return_features=True, returns (outputs, final_decoder_features) so a
+    downstream head can replace the final prediction without discarding the
+    auxiliary outputs.
   """
   features: int = 64
   depth: int = 3
@@ -666,7 +669,8 @@ class MAXIM(nn.Module):
   dropout_rate: float = 0.0
 
   @nn.compact
-  def __call__(self, x: jnp.ndarray, *, train: bool = False, return_features: bool = False) -> Any:
+  def __call__(self, x: jnp.ndarray, *, train: bool = False,
+               return_features: bool = False) -> Any:
 
     n, h, w, c = x.shape  # input image shape
     shortcuts = []
@@ -880,8 +884,9 @@ class MAXIM(nn.Module):
       outputs_all.append(outputs)
 
     if return_features:
-      # returning final features instead of outputs allows to connect with MoE Router
-      return final_features
+      # The MoE needs the final decoder features for its expert heads, while
+      # retaining MAXIM's multi-stage/multi-scale outputs for deep supervision.
+      return outputs_all, final_features
     return outputs_all
 
 
