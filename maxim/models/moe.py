@@ -1,6 +1,7 @@
 import functools
 
 from flax import linen as nn
+from jax import nn as jax_nn
 import jax.numpy as jnp
 
 from maxim.models.maxim import MAXIM
@@ -32,12 +33,30 @@ class MaximMoE(nn.Module):
     maxim: MAXIM
     router: RouterModel
     experts: list[ExpertHead]
+    routing_mode: str = "learned"
 
-    def __call__(self, x, train=True):
-        # Router on the image
-        router_logits = self.router(x, train=train)
-        temperature = 1.5 if train else 1.0
-        gates = nn.softmax(router_logits / temperature, axis=-1)  # [B, E]
+    def __call__(self, x, train=True, task_id=None):
+        num_experts = len(self.experts)
+        if self.routing_mode == "oracle":
+            if task_id is None:
+                raise ValueError("task_id is required for oracle routing.")
+            task_id = jnp.asarray(task_id, dtype=jnp.int32).reshape(-1)
+            if task_id.shape[0] != x.shape[0]:
+                raise ValueError(
+                    "task_id must contain exactly one id per input image."
+                )
+            # The dataset task index is the expert index. This deterministic
+            # routing removes the learned router from the oracle experiment.
+            gates = jax_nn.one_hot(task_id, num_experts, dtype=x.dtype)  # [B, E]
+        elif self.routing_mode == "learned":
+            router_logits = self.router(x, train=train)
+            temperature = 1.5 if train else 1.0
+            gates = nn.softmax(router_logits / temperature, axis=-1)  # [B, E]
+        else:
+            raise ValueError(
+                f"Unknown routing_mode={self.routing_mode!r}; "
+                "expected 'oracle' or 'learned'."
+            )
 
         # Preserve MAXIM's deep-supervision outputs and use only the last
         # decoder features as input to the expert reconstruction heads.
