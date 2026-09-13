@@ -123,6 +123,7 @@ params_moe = freeze(params_moe)
 y_maxim = maxim_model.apply({"params": params_maxim}, x, train=False)
 y_maxim = y_maxim[-1][-1]
 y_moe, gates = moe_model.apply({"params": params_moe, 'batch_stats': batch_stats}, x, train=False)
+y_moe = y_moe[-1][-1]
 
 diff = jnp.mean(jnp.abs(y_maxim - y_moe))
 print(diff)
