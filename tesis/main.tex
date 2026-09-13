@@ -1,0 +1,282 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Plantilla de tesis FaMAF/UNC
+% Archivo principal corregido para Overleaf
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[
+  11pt,
+  oneside,
+  english,
+  spanish,
+  singlespacing,
+  headsepline
+]{MastersDoctoralThesis}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathpazo}
+\usepackage{amsmath}
+\IfFileExists{biblatex.sty}{%
+  \usepackage[backend=bibtex,style=numeric,natbib=true,bibencoding=utf-8]{biblatex}
+  \addbibresource{list.bib}
+}{%
+  % Respaldo para instalaciones mínimas. Overleaf normalmente usa biblatex.
+  \usepackage[numbers]{natbib}
+  \newcommand{\printbibliography}{%
+    \bibliographystyle{plainnat}%
+    \bibliography{list}%
+  }
+}
+\usepackage[autostyle=true]{csquotes}
+
+\geometry{
+  paper=a4paper,
+  inner=2.5cm,
+  outer=3.8cm,
+  bindingoffset=.5cm,
+  top=1.5cm,
+  bottom=1.5cm
+}
+\setlength{\headheight}{13.6pt}
+
+\thesistitle{Restauración de imágenes mediante MAXIM y Mixture of Experts}
+\author{Matías A. Murat}
+\supervisor{Martín A. Domínguez y Francisco A. Tamarit}
+\subject{}
+\keywords{}
+\university{Universidad Nacional de Córdoba}
+\department{}
+\faculty{Facultad de Matemática, Astronomía, Física y Computación}
+
+\AtBeginDocument{
+  \hypersetup{
+    pdftitle={\ttitle},
+    pdfauthor={\authorname},
+    pdfkeywords={\keywordnames}
+  }
+}
+
+\begin{document}
+\sloppy
+\frontmatter
+\pagestyle{plain}
+
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\begin{center}
+  \IfFileExists{Figures/crest.png}{%
+    \includegraphics[scale=0.5]{Figures/crest.png}\par
+    \vspace*{.06\textheight}
+  }{}
+
+  {\scshape\LARGE \facname\par}\vspace{1cm}
+  \textsc{\Large Trabajo especial de Licenciatura en Ciencias de la Computación}\\[0.5cm]
+
+  \HRule\\[0.4cm]
+  {\huge\bfseries \ttitle\par}\vspace{0.4cm}
+  \HRule\\[1.5cm]
+
+  \begin{minipage}[t]{0.4\textwidth}
+    \begin{flushleft}\large
+      \emph{Autor:}\\
+      \authorname
+    \end{flushleft}
+  \end{minipage}
+  \begin{minipage}[t]{0.4\textwidth}
+    \begin{flushright}\large
+      \emph{Directores:}\\
+      \supname
+    \end{flushright}
+  \end{minipage}\\[3cm]
+
+  \vfill
+  {\large \today}\\[2cm]
+
+  \IfFileExists{licenciagv.png}{\includegraphics[scale=0.8]{licenciagv.png}\par}{}
+  Esta obra está bajo una
+  \href{https://creativecommons.org/licenses/by-nc-sa/4.0/}%
+       {Licencia Creative Commons Atribución-NoComercial-CompartirIgual 4.0 Internacional}.
+  \vfill
+\end{center}
+\end{titlepage}
+\hypersetup{pageanchor=true}
+
+\begin{abstract}
+\addchaptertocentry{Resumen}
+Acá va el resumen. Debe ser breve, aproximadamente media carilla.
+\end{abstract}
+
+\begin{acknowledgements}
+\addchaptertocentry{Agradecimientos}
+Acá van los agradecimientos. Esta sección es optativa.
+\end{acknowledgements}
+
+{
+  \hypersetup{linkcolor=black}
+  \tableofcontents
+  \listoffigures
+  \renewcommand{\listtablename}{Índice de tablas}
+  \listoftables
+}
+
+\dedicatory{Dedicado a quien quieras. Esta página es optativa.}
+
+\mainmatter
+\pagestyle{thesis}
+
+\chapter{Introducción}
+\label{chap:introduccion}
+
+La producción y el intercambio de imágenes digitales forman parte de una gran
+cantidad de actividades cotidianas, científicas e industriales. Las imágenes
+capturadas por cámaras, teléfonos, sistemas de vigilancia, instrumental médico
+o sensores remotos rara vez se obtienen en condiciones ideales. El movimiento
+de la cámara o de la escena puede introducir desenfoque; la iluminación
+insuficiente reduce el contraste y oculta detalles; las condiciones
+atmosféricas alteran la visibilidad; el ruido del sensor degrada las regiones de
+baja señal y la lluvia puede superponer estructuras ajenas a la escena. Estas
+alteraciones no solo afectan la calidad visual, sino que también pueden
+perjudicar tareas posteriores de visión por computadora, como la detección, la
+segmentación o el reconocimiento de objetos.
+
+La restauración de imágenes estudia cómo recuperar una imagen limpia a partir
+de una observación degradada. En términos generales, puede interpretarse como
+un problema inverso: se observa el resultado de un proceso de formación y
+degradación, y se intenta estimar la escena que lo originó. El problema es
+difícil porque diferentes imágenes limpias pueden dar lugar a observaciones
+similares y porque, en aplicaciones reales, el tipo y la intensidad de la
+degradación no siempre son conocidos. Por esta razón, una reconstrucción
+adecuada requiere aprovechar tanto la información local ---bordes, texturas y
+detalles finos--- como el contexto global de la imagen.
+
+Durante los últimos años, los métodos basados en aprendizaje profundo han
+reemplazado gran parte de los procedimientos diseñados de manera específica
+para cada degradación. A partir de pares de imágenes degradadas y sus
+correspondientes referencias, una red neuronal puede aprender una transformación
+de restauración sin que sea necesario definir explícitamente todas las etapas
+del proceso inverso. Sin embargo, es habitual entrenar un modelo distinto para
+cada tarea. Esta estrategia permite una alta especialización, pero obliga a
+mantener y ejecutar varios modelos cuando un sistema debe responder ante
+degradaciones heterogéneas.
+
+Una alternativa consiste en entrenar un único modelo para varias tareas de
+restauración. Este enfoque reduce la duplicación de parámetros y permite
+compartir representaciones entre problemas relacionados. Al mismo tiempo,
+introduce una dificultad: eliminar ruido, compensar desenfoque, remover lluvia,
+reducir neblina y realzar una imagen oscura requieren transformaciones
+diferentes y, en algunos casos, parcialmente contrapuestas. Un único camino de
+cómputo debe aprender entonces una solución suficientemente general para todas
+ellas. Si la capacidad compartida no puede adaptarse al tipo de degradación
+presente en cada entrada, el aprendizaje conjunto puede producir interferencia
+entre tareas y limitar la calidad de la reconstrucción.
+
+En este trabajo se toma como arquitectura de base a MAXIM
+(\textit{Multi-Axis MLP for Image Processing}), una red propuesta para tareas de
+procesamiento y restauración de imágenes \citep{tu2022maxim}. MAXIM combina una
+estructura jerárquica de tipo codificador--decodificador con bloques capaces de
+modelar interacciones locales y globales. Su diseño permite integrar información
+de distintas escalas y conservar detalles espaciales mediante conexiones entre
+las etapas de codificación y decodificación. Estas propiedades la convierten en
+una base apropiada para estudiar restauración multi-tarea: el modelo dispone de
+un extractor común de características, pero su formulación estándar mantiene el
+mismo flujo de procesamiento para todas las entradas.
+
+La hipótesis que motiva esta tesis es que dicho flujo compartido puede
+complementarse con el paradigma \textit{Mixture of Experts} (MoE). En una mezcla
+de expertos, varios módulos con capacidad de especialización colaboran bajo el
+control de un ruteador, que asigna a cada experto una relevancia dependiente de
+la entrada \citep{jacobs1991adaptive,shazeer2017outrageously}. En lugar de exigir
+que todos los parámetros resuelvan de la misma forma cualquier degradación, el
+modelo puede compartir una parte sustancial del procesamiento y reservar otra
+parte para respuestas especializadas. El ruteador actúa como un mecanismo de
+adaptación: a partir de las características de la imagen, determina qué expertos
+deben intervenir y con qué peso en la reconstrucción.
+
+La combinación de MAXIM y MoE plantea un compromiso entre generalización,
+especialización y costo computacional. Replicar una red completa por cada tarea
+produciría especialistas independientes, pero eliminaría gran parte del
+beneficio de un modelo unificado. En el extremo opuesto, añadir expertos con
+muy poca capacidad o mezclarlos de forma prácticamente idéntica para todas las
+entradas no garantiza que surjan comportamientos distintos. Por lo tanto, la
+ubicación de los expertos, su capacidad, la señal utilizada por el ruteador y
+la forma de entrenar la mezcla constituyen decisiones centrales. También es
+necesario preservar los mecanismos de supervisión profunda y multi-escala de
+la arquitectura base, ya que proporcionan señales de aprendizaje en diferentes
+niveles de la reconstrucción.
+
+El problema abordado puede formularse del siguiente modo: dada una colección
+de pares $(x,y)$, donde $x$ es una imagen afectada por alguna de varias
+degradaciones e $y$ es su referencia limpia, se busca aprender una función
+$F$ tal que $F(x)$ aproxime a $y$ sin requerir, como condición de entrada, una
+etiqueta que indique la tarea. Para la variante con expertos, esta función se
+expresa conceptualmente como
+
+\begin{equation}
+  \widehat{y} = \sum_{k=1}^{K} p_k(x)\,E_k\!\left(f_{\theta}(x)\right),
+  \label{eq:intro-moe}
+\end{equation}
+
+donde $f_{\theta}$ representa el procesamiento compartido realizado por MAXIM,
+$E_k$ es el $k$-ésimo experto y $p_k(x)$ es el peso asignado por el ruteador.
+Los pesos dependen de la entrada y satisfacen $p_k(x)\geq 0$ y
+$\sum_{k=1}^{K}p_k(x)=1$. La Ecuación~\ref{eq:intro-moe} describe la idea
+general; la arquitectura concreta, la posición de las mezclas y las pérdidas
+empleadas se presentan en los capítulos metodológicos.
+
+El objetivo general de esta tesis es diseñar y evaluar una extensión de MAXIM
+basada en mezcla de expertos para restaurar imágenes afectadas por distintos
+tipos de degradación dentro de un único modelo. La evaluación busca determinar
+si la especialización condicionada por la entrada aporta ventajas frente a una
+línea base MAXIM multi-tarea entrenada en condiciones equivalentes.
+
+Para alcanzar este objetivo general se plantean los siguientes objetivos
+específicos:
+
+\begin{itemize}
+  \item implementar y entrenar una línea base de MAXIM que sirva como referencia
+        reproducible para las comparaciones;
+  \item construir un conjunto de entrenamiento multi-tarea con ejemplos de
+        eliminación de desenfoque, neblina, ruido y lluvia, además de realce de
+        imágenes con baja iluminación;
+  \item incorporar uno o más mecanismos de mezcla de expertos a la arquitectura,
+        procurando conservar la supervisión profunda y el procesamiento en
+        múltiples escalas;
+  \item estudiar estrategias de ruteo y regularización que favorezcan el uso
+        diferenciado de los expertos sin provocar una asignación degenerada;
+  \item comparar las variantes mediante métricas cuantitativas de calidad,
+        inspección visual, costo computacional y análisis del comportamiento del
+        ruteador.
+\end{itemize}
+
+La comparación experimental se diseña para aislar, en la medida de lo posible,
+el efecto de la mezcla de expertos. Esto exige utilizar los mismos datos, el
+mismo presupuesto de entrenamiento y configuraciones de capacidad comparables
+entre el modelo propuesto y la línea base. Además de medir la calidad final de
+las imágenes, resulta necesario observar si los expertos desarrollan funciones
+diferenciadas y si las decisiones del ruteador guardan relación con las
+degradaciones presentes. De este modo, el análisis no queda limitado a una
+única métrica agregada, sino que considera también el mecanismo que se pretende
+introducir.
+
+El alcance del trabajo se concentra en restauración supervisada de imágenes y
+en un conjunto finito de degradaciones representadas por conjuntos de datos de
+referencia. No se presupone que cada experto deba corresponder de manera rígida
+con una tarea: la especialización puede organizarse por tipo de degradación,
+nivel de severidad o patrones visuales compartidos. Tampoco se asume de
+antemano que la incorporación de expertos producirá una mejora. Su utilidad
+debe establecerse mediante una comparación controlada con MAXIM y mediante el
+análisis de las rutas aprendidas durante el entrenamiento.
+
+El resto de la tesis se organiza de la siguiente manera. El Capítulo 2
+presenta los fundamentos de restauración de
+imágenes, MAXIM y las mezclas de expertos. Los capítulos posteriores describen
+los conjuntos de datos, la arquitectura propuesta, la implementación y el
+protocolo experimental. Finalmente, se exponen y discuten los resultados de las
+comparaciones, para luego presentar las conclusiones y posibles líneas de
+continuación. Esta organización mantiene separados el planteo del problema, las
+decisiones metodológicas y la evidencia experimental utilizada para evaluar la
+propuesta.
+
+\appendix
+\printbibliography
+\end{document}
