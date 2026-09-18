@@ -27,6 +27,47 @@ class ExpertHead(nn.Module):
         return x
 
 
+class ResidualExpertHead(nn.Module):
+    """Higher-capacity residual reconstruction head for one task.
+
+    The hidden convolutions preserve the MAXIM feature width, so the final
+    ``output_conv`` has the same input/output contract as ``ExpertHead``. This
+    keeps the optional warm-start path compatible with MAXIM's final output
+    convolution while adding nonlinear task-specific processing.
+    """
+
+    out_channels: int = 3
+    use_bias: bool = True
+    num_hidden_layers: int = 2
+
+    @nn.compact
+    def __call__(self, x):
+        if self.num_hidden_layers < 1:
+            raise ValueError("num_hidden_layers must be at least 1")
+
+        shortcut = x
+        hidden_channels = x.shape[-1]
+        h = x
+        for index in range(self.num_hidden_layers):
+            h = Conv3x3(
+                hidden_channels,
+                padding="SAME",
+                use_bias=self.use_bias,
+                name=f"hidden_conv_{index}",
+            )(h)
+            h = nn.gelu(h)
+
+        # Internal residual connection keeps the extra capacity close to the
+        # identity at initialization and preserves stable gradient flow.
+        h = nn.gelu(h + shortcut)
+        return Conv3x3(
+            self.out_channels,
+            padding="SAME",
+            use_bias=self.use_bias,
+            name="output_conv",
+        )(h)
+
+
 class MaximMoE(nn.Module):
     """MAXIM with deep supervision and an MoE final reconstruction head."""
 
