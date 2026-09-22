@@ -1,6 +1,7 @@
 import functools
 
 from flax import linen as nn
+import jax
 from jax import nn as jax_nn
 import jax.numpy as jnp
 
@@ -75,8 +76,9 @@ class MaximMoE(nn.Module):
     router: RouterModel
     experts: list[ExpertHead]
     routing_mode: str = "learned"
+    top_k: int = 0
 
-    def __call__(self, x, train=True, task_id=None):
+    def _route(self, x, train, task_id):
         num_experts = len(self.experts)
         if self.routing_mode == "oracle":
             if task_id is None:
@@ -86,18 +88,37 @@ class MaximMoE(nn.Module):
                 raise ValueError(
                     "task_id must contain exactly one id per input image."
                 )
-            # The dataset task index is the expert index. This deterministic
-            # routing removes the learned router from the oracle experiment.
-            gates = jax_nn.one_hot(task_id, num_experts, dtype=x.dtype)  # [B, E]
+            gates = jax_nn.one_hot(task_id, num_experts, dtype=x.dtype)
         elif self.routing_mode == "learned":
             router_logits = self.router(x, train=train)
             temperature = 1.5 if train else 1.0
-            gates = nn.softmax(router_logits / temperature, axis=-1)  # [B, E]
+            probabilities = nn.softmax(router_logits / temperature, axis=-1)
+            if self.top_k:
+                if not 1 <= self.top_k <= num_experts:
+                    raise ValueError(
+                        f"top_k must be in [1, {num_experts}], got {self.top_k}."
+                    )
+                if self.top_k < num_experts:
+                    _, top_indices = jax.lax.top_k(router_logits, self.top_k)
+                    mask = jnp.sum(
+                        jax_nn.one_hot(top_indices, num_experts, dtype=x.dtype),
+                        axis=-2,
+                    )
+                    probabilities = probabilities * mask
+                    probabilities = probabilities / jnp.sum(
+                        probabilities, axis=-1, keepdims=True
+                    )
+            gates = probabilities
         else:
             raise ValueError(
                 f"Unknown routing_mode={self.routing_mode!r}; "
                 "expected 'oracle' or 'learned'."
             )
+        return gates
+
+    def __call__(self, x, train=True, task_id=None):
+        gates = self._route(x, train, task_id)
+        num_experts = len(self.experts)
 
         # Preserve MAXIM's deep-supervision outputs and use only the last
         # decoder features as input to the expert reconstruction heads.
