@@ -7,6 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOKS = (
     REPO_ROOT / "maxim" / "maximTrainer_no_moe.ipynb",
     REPO_ROOT / "maxim" / "moeTrainer.ipynb",
+    REPO_ROOT / "maxim" / "moeTrainer_latent_k8.ipynb",
 )
 
 
