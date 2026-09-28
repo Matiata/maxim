@@ -1,12 +1,16 @@
 # Plan de mejora de MAXIM + Mixture of Experts
 
-Última actualización: 22 de septiembre de 2026.
+Última actualización: 28 de septiembre de 2026.
 
 ## Objetivo
 
-Comparar MAXIM S-2 con MAXIM+MoE bajo el mismo dataset, supervisión multietapa/multiescala y protocolo experimental. El MoE debe producir especialización observable y, finalmente, routing aprendido útil.
+Comparar MAXIM S-2 con MAXIM+MoE bajo el mismo dataset, supervisión multietapa/multiescala, presupuesto de optimización y protocolo de evaluación. El MoE debe producir especialización observable sin sacrificar la ruta común de reconstrucción.
 
-No se realizará la ablación MoE con una única cabeza. La baseline relevante es MAXIM original sin MoE, conservando su supervisión profunda.
+Las siguientes iteraciones se harán en tres bloques, en este orden:
+
+1. corregir y hacer explícitas las métricas y el protocolo de selección de checkpoints;
+2. convertir la branch K=8 en un MoE token-choice real, con routing independiente para cada token de features de MAXIM;
+3. actualizar la variante con cabeza compartida para inicializarla desde un checkpoint baseline y compararla contra una continuación equivalente del baseline.
 
 ## Estado actual
 
@@ -15,23 +19,19 @@ No se realizará la ablación MoE con una única cabeza. La baseline relevante e
 | Auditoría y corrección de datos | Completado | Pares problemáticos corregidos o aceptados por criterio de dominio |
 | Ampliación SIDD `denoise` | Completado | 5.060 pares nuevos normalizados, combinados y verificados en Drive |
 | Supervisión profunda del MoE | Completado | Cinco salidas auxiliares y una salida final MoE para S-2 |
-| Diagnósticos del router | Completado | JSON, heatmaps y métricas globales/por tarea |
-| Routing oracle | Completado | Routing perfecto; muestreo uniforme corregido |
-| Fine-tuning con LR bajo | Completado | Mejora global marginal; LR no es el cuello de botella principal |
-| Smoke test del dataset ampliado | Completado | Listas, hashes, rutas y batches reales validados desde Drive |
-| Baseline MAXIM comparable | Completado | 30 épocas; mejor checkpoint en época 28: 27,455 dB ponderado y 30,822 dB macro |
-| MoE oracle comparable | Completado | 30 épocas; mejor resultado en época 30: 27,362 dB ponderado y 30,547 dB macro |
-| Expertos con mayor capacidad | Completado | `ResidualExpertHead` entrenado 30 épocas; mejora el macro y algunas tareas, pero no el global ponderado |
-| Verificación del archivo SIDD que interrumpió la época 27 | Completado | El par `imgs/`–`GT/` existe, está alineado y ambos PNG se decodifican completamente; el fallo fue transitorio de lectura/montaje |
-| Cabeza compartida + expertos residuales | Implementado en `main` | MAXIM conserva su predicción final y los expertos aprenden sólo correcciones residuales condicionadas |
-| Expertos latentes K>5 | Planificado | Branch propuesta `exp/latent-experts-k8`; comparar K=5 y K=8 con routing aprendido sin etiquetas de tarea |
-| Router supervisado tarea→experto | Secundario / pendiente | Conservar sólo como ablación diagnóstica; no es el siguiente camino principal de mejora |
+| Muestreo uniforme de entrenamiento | Completado | Cada tarea recibe aproximadamente 20 % de exposición |
+| Baseline MAXIM comparable | Completado | Mejor checkpoint: 27,455 dB ponderado y 30,822 dB macro |
+| MoE oracle K=5 simple | Completado | 27,362 dB ponderado y 30,547 dB macro |
+| MoE oracle K=5 residual | Completado | 27,114 dB ponderado y 30,980 dB macro |
+| MoE K=5 con cabeza compartida | Completado | 27,350 dB ponderado y 30,720 dB macro |
+| MoE latente K=8 top-2 | Completado | 27,060 dB ponderado y 30,800 dB macro; cuatro de ocho expertos quedaron inactivos |
+| Corrección del protocolo de métricas | Siguiente | Separar ponderado/macro, criterio de checkpoint y funciones de validación/test |
+| MoE token-choice K=8 sobre features | Pendiente | Enrutar cada token del feature map por separado; sin pooling global ni gate único por imagen |
+| Cabeza compartida inicializada desde baseline | Pendiente | Cargar parámetros baseline, inicializar residuales en cero y entrenar con control baseline de igual presupuesto adicional |
 
 ## Datasets finales
 
-La carga ampliada fue revisada directamente en Drive y confirmada como correcta.
-
-| Tarea | Train | Test | Total |
+| Tarea | Train | Evaluación actual | Total |
 |---|---:|---:|---:|
 | deblur | 8.680 | 3.150 | 11.830 |
 | dehaze | 909 | 101 | 1.010 |
@@ -40,265 +40,261 @@ La carga ampliada fue revisada directamente en Drive y confirmada como correcta.
 | enhance | 5.469 | 30 | 5.499 |
 | **Total** | **23.108** | **4.448** | **27.556** |
 
-### Cambios de `denoise`
+No se debe balancear la evaluación descartando imágenes de `deblur` ni duplicando imágenes de tareas pequeñas. Se conservarán todas las muestras y se reportarán dos agregados diferentes:
 
-- Se seleccionaron 34 escenas de SIDD Full sRGB.
-- Una escena oficial contenía 110 pares, por lo que se obtuvieron 5.060 y no 5.100 pares nuevos.
-- El split nuevo aporta 4.310 train y 750 test, separados por escena.
-- Se conservaron los 157 pares anteriores; ocho se reasignaron para evitar fuga entre splits.
-- Las listas combinadas finales son `datasets/drive_merge/train.txt` y `datasets/drive_merge/test.txt`.
-- SHA-256: train `3f7924a6a20171883cb0a07e3b6c9d1e64d89879526c4baa3f72721403040afa`; test `45fb0b36422f23d017ec2d95957043c2b64301e9423d16766f594cab618ed419`.
-- Ruta en Drive: `MyDrive/Facultad/tesis/Datasets/Classifier/denoise`.
+- **PSNR ponderado:** promedio de los PSNR por tarea ponderado por la cantidad de imágenes de cada tarea; equivale al promedio por imagen con la implementación actual.
+- **PSNR macro:** promedio de los cinco PSNR por tarea; asigna 20 % a cada tarea.
 
-### Auditoría cerrada
-
-- `derain`: se corrigieron y validaron 200 GT `rain_light_*`; los `rain_heavy_*` estaban bien.
-- `enhance`: se corrigió `a3291-LS051026_day_2_arive38.png`; el duplicado `a2931-jn_20081025_Kent_Shelter_413.png` fue eliminado junto con su entrada.
-- `deblur`: los desplazamientos observados corresponden al blur esperado.
-- `dehaze`: las imágenes suaves o visualmente duplicadas se aceptaron como efecto del haze.
-- Las augmentations aplican transformaciones alineadas a input y GT.
-- `SIDD_0062_003_S6_03200_02500_4400_L_001.png`: se verificaron las copias de `imgs/` y `GT/`. Ambas son RGB de 8 bits, miden `5328×3000`, se descargan y decodifican completamente y muestran la misma escena alineada. La entrada tiene el ruido intenso esperado y el GT es la versión limpia. SHA-256 de la descarga completa: `imgs` `fe9f4876ac160cb506055dc63aff9c0b2439fead173b78f80bc3ce6edc48bb28`; `GT` `d104a921bebc0cd85412aa92ab9778540ffe530e66ce78c4179bbca757d09f5a`. El primer intento de descarga durante la revisión también se truncó y el segundo fue correcto, reforzando la hipótesis de una falla transitoria de acceso a Drive.
-
-No se repetirá la auditoría completa.
+Los resultados por tarea y sus conteos son obligatorios. Para `enhance`, cuyo conjunto actual tiene sólo 30 imágenes, se debe informar además que la estimación tiene mayor incertidumbre.
 
 ## Evidencia experimental acumulada
 
-### Routing oracle con muestreo corregido
+| Modelo | Deblur | Dehaze | Denoise | Derain | Enhance | Ponderado | Macro |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| MAXIM baseline | 24,554 | 42,824 | **38,087** | 26,428 | 22,216 | **27,455** | 30,822 |
+| MoE K=5 simple oracle | **24,659** | 41,934 | 36,970 | **26,931** | 22,240 | 27,362 | 30,547 |
+| MoE K=5 residual oracle | 24,611 | **45,757** | 35,568 | 26,244 | **22,720** | 27,114 | **30,980** |
+| MoE K=5 compartida + residual | 24,610 | 42,660 | 37,060 | 26,780 | 22,490 | 27,350 | 30,720 |
+| MoE K=8 residual aprendido top-2 | 24,230 | 45,200 | 37,190 | 25,740 | 21,640 | 27,060 | 30,800 |
 
-La primera corrida reveló que repetir el dataset después de mezclarlo agotaba primero las tareas pequeñas. La corrección repite cada fuente antes de `sample_from_datasets`. En 120.000 muestras, cada tarea recibió aproximadamente 20 % de exposición.
+### Conclusión de la corrida K=8 actual
 
-| Tarea | Oracle corregido |
-|---|---:|
-| deblur | 24,635 dB |
-| dehaze | 41,782 dB |
-| denoise | 39,036 dB |
-| derain | 26,887 dB |
-| enhance | 21,938 dB |
-| **Global ponderado** | **25,384 dB** |
+- El router encontró asociaciones sin usar `task_id` para seleccionar expertos.
+- `deblur` y `dehaze` se concentraron en el par `E1/E4`.
+- `denoise` y `derain` se concentraron en el par `E2/E6`.
+- `enhance` mantuvo routing más disperso.
+- `E0`, `E3`, `E5` y `E7` quedaron con uso cero: K=8 se comportó en la práctica como cuatro expertos organizados en dos pares.
+- El valor `expertos efectivos=2` del log mide diversidad por imagen y es esperable con top-2; no mide cuántos expertos se usan globalmente.
+- El K=8 actual usa cabezas residuales independientes, no la cabeza compartida. Por eso no debe interpretarse como una ablación exclusiva de `K` o del router.
+- La corrida queda como control histórico. No continuarla desde su checkpoint después de cambiar el router o la arquitectura.
 
-El routing mantuvo 100 % de accuracy, confianza 1 y entropía 0. La exposición desigual queda descartada como causa del rezago de `deblur`, `derain` y `enhance`.
+## Bloque 1 — Corregir métricas y protocolo de evaluación
 
-### Fine-tuning con optimizador y LR reiniciados
+### Cambios de implementación
 
-Cinco épocas adicionales con cosine decay `1e-5 → 1e-6` elevaron el PSNR global de `25,384` a `25,422 dB`. La salida final mejoró sólo 0,37 % en L1; por lo tanto, prolongar el mismo fine-tuning no promete una mejora grande. La capacidad de las cabezas es la siguiente hipótesis.
+1. Reemplazar el campo ambiguo `psnr` por nombres explícitos:
+   - `psnr_weighted`;
+   - `psnr_macro`;
+   - `task_psnr`;
+   - `task_count`.
+2. Mantener el PSNR por imagen actual y agregarlo por tarea mediante sumas y conteos.
+3. Calcular:
 
-El PSNR global está dominado por `deblur`. Todas las corridas futuras deben informar también promedio macro y resultados por tarea.
+   `psnr_weighted = sum(task_psnr[t] * task_count[t]) / sum(task_count)`
 
-### Baseline MAXIM S-2 sin MoE
+   `psnr_macro = mean(task_psnr[t] for t in tareas_presentes)`
 
-La corrida comparable finalizó sus 30 épocas y evaluó los 4.448 pares de test en cada validación. El mejor checkpoint corresponde a la época 28.
+4. No calcular el macro a partir del PSNR ponderado.
+5. Guardar en cada JSON de época ambos agregados, los cinco resultados por tarea, los conteos y el criterio usado para seleccionar el checkpoint.
+6. Cambiar el checkpoint principal para seleccionar por `psnr_macro` de validación. Guardar opcionalmente un segundo checkpoint `best_weighted_checkpoint` para análisis.
+7. Actualizar `best_metric.json` para incluir como mínimo:
+   - época;
+   - `selection_metric`;
+   - `psnr_macro`;
+   - `psnr_weighted`;
+   - `task_psnr`;
+   - `task_count`.
+8. Aplicar exactamente la misma implementación en baseline, MoE K=5, K=8 y cabeza compartida.
 
-| Tarea | PSNR del mejor checkpoint |
-|---|---:|
-| deblur | 24,554 dB |
-| dehaze | 42,824 dB |
-| denoise | 38,087 dB |
-| derain | 26,428 dB |
-| enhance | 22,216 dB |
-| **Global ponderado** | **27,455 dB** |
-| **Promedio macro** | **30,822 dB** |
+### Validación y test
 
-La época 30 terminó con 27,406 dB ponderado y 30,768 dB macro, apenas 0,049 dB por debajo del mejor valor, por lo que la corrida llegó a una meseta estable. El log acumulado contiene dos resultados para las épocas 13 y 27: los primeros pertenecen a ramas interrumpidas que no quedaron guardadas. Las reanudaciones restauraron respectivamente los checkpoints completos de las épocas 12 y 26, repitieron esas épocas y continuaron con estado del optimizador, `state.step` y LR coherentes. Para curvas y tablas deben usarse solamente los segundos resultados de las épocas 13 y 27.
+El notebook actual lee `test.txt` después de cada época y usa ese valor para elegir el mejor checkpoint. Metodológicamente ese conjunto está funcionando como validación.
 
-Sobre la cadena final de 60.000 pasos y 120.000 muestras, cada tarea recibió entre 19,73 % y 20,59 % de exposición. El muestreo uniforme funcionó como estaba previsto y no introduce un desbalance relevante en esta baseline.
+Se debe:
 
-### MoE oracle con dataset ampliado
+1. agregar soporte explícito para `train.txt`, `val.txt` y `test.txt`;
+2. usar `val.txt` durante entrenamiento y para seleccionar checkpoints;
+3. evaluar `test.txt` sólo una vez con el checkpoint ya elegido;
+4. evitar fugas por escena al construir `val.txt`;
+5. registrar conteos y SHA-256 de las tres listas.
 
-La corrida `moe_oracle_all_S-2_scratch` del 18/09 completó 30 épocas con el mismo split actual de 4.448 pares, 2.000 pasos por época, S-2, batch, seed y supervisión profunda que la baseline. El mejor resultado fue la época 30.
+Decisión práctica: no cambiar silenciosamente los splits dentro del código. Si todavía no existe `val.txt`, el notebook debe detenerse con un mensaje claro. La creación del nuevo split debe hacerse con un script determinista, agrupado por escena y versionado. Si el nuevo `val.txt` se extrae del train actual, las comparaciones finales estrictas requerirán volver a entrenar el baseline y las variantes seleccionadas con ese mismo split.
 
-| Tarea | MAXIM sin MoE (ép. 28) | MoE oracle (ép. 30) | MoE − MAXIM |
-|---|---:|---:|---:|
-| deblur | 24,554 | 24,659 | +0,105 |
-| dehaze | 42,824 | 41,934 | −0,890 |
-| denoise | 38,087 | 36,970 | −1,117 |
-| derain | 26,428 | 26,931 | +0,503 |
-| enhance | 22,216 | 22,240 | +0,024 |
-| **Global ponderado** | **27,455** | **27,362** | **−0,093** |
-| **Promedio macro** | **30,822** | **30,547** | **−0,275** |
+Los resultados históricos se conservarán bajo el protocolo anterior y no se mezclarán en una misma tabla final con resultados obtenidos bajo un split nuevo.
 
-El MoE oracle queda apenas 0,093 dB por debajo de la baseline en el global, por lo que no hay una mejora global demostrada todavía. Sí mejora `derain` en 0,503 dB y `deblur` en 0,105 dB, mientras que pierde en `dehaze` y especialmente `denoise`. El routing oracle fue perfecto en validación (accuracy 1, confianza 1, entropía 0 y uso tarea→experto diagonal), así que esta diferencia ya no se explica por errores de routing.
+### Pruebas de aceptación
 
-En los 120.000 ejemplos de entrenamiento, la exposición por tarea fue 19,77 %, 19,94 %, 19,97 %, 19,86 % y 20,46 %, respectivamente. El muestreo tampoco explica el resultado.
+- Test sintético con tareas de tamaños distintos que confirme los valores ponderado y macro esperados.
+- Con las métricas de la época 27 K=8, el código debe reproducir aproximadamente `27,06 dB` ponderado y `30,80 dB` macro.
+- El log debe imprimir claramente `validation ponderado`, `validation macro` y el criterio de guardado.
+- Ninguna variable denominada `test_dataset` debe usarse dentro del bucle por época.
+- La evaluación final de test no debe actualizar ni reemplazar checkpoints.
 
-### Variante de expertos residuales
+## Bloque 2 — MoE token-choice K=8 sobre features
 
-Se implementó `ResidualExpertHead` en `maxim/models/moe.py`. Cada experto conserva el ancho de canales de las features de MAXIM, aplica dos convoluciones `3×3` ocultas con GELU, suma una conexión residual interna y termina en una `output_conv` `3×3`. La salida sigue siendo compatible con el residual final `output + input` y la inicialización opcional desde la convolución de salida de MAXIM.
+Branch de trabajo: `exp/latent-experts-k8`.
 
-`maxim/moeTrainer.ipynb` queda configurado con `EXPERT_HEAD_VARIANT="residual"`, `EXPERT_NUM_HIDDEN_LAYERS=2` y un `OUTPUT_DIR` separado (`v2_residual_expert_heads`). Antes de una corrida completa se debe ejecutar el preflight/smoke test y comprobar las shapes de la salida final y la carga del checkpoint; no se pudo hacer la inicialización JAX en el entorno local porque JAX sólo está instalado en Colab.
+### Cambio arquitectónico
 
-La corrida posterior completó las 30 épocas. En la época 27 ocurrió un fallo transitorio de lectura de `SIDD_0062_003_S6_03200_02500_4400_L_001.png`; el entrenamiento se reanudó desde el checkpoint 26 y finalizó correctamente. El archivo fue revisado posteriormente y es válido. La métrica se considera válida porque la época 27 incompleta no quedó guardada y se ejecutó nuevamente desde el checkpoint completo de la época 26.
+El router actual recibe una imagen RGB completa, aplica global average pooling y produce un único vector `[B, K]`. Esa implementación es routing por imagen y debe reemplazarse, no adaptarse.
 
-| Tarea | Baseline MAXIM | MoE residual (mejor global, ép. 27) | MoE residual − baseline |
-|---|---:|---:|---:|
-| deblur | 24,554 | 24,611 | +0,057 |
-| dehaze | 42,824 | 45,757 | +2,933 |
-| denoise | 38,087 | 35,568 | −2,519 |
-| derain | 26,428 | 26,244 | −0,184 |
-| enhance | 22,216 | 22,720 | +0,504 |
-| **Global ponderado** | **27,455** | **27,114** | **−0,341** |
-| **Promedio macro** | **30,822** | **30,980** | **+0,158** |
+La nueva arquitectura debe realizar token-choice exclusivamente en el espacio de features:
 
-El resultado confirma que aumentar la capacidad de los expertos cambia la especialización, pero no mejora el objetivo global: `dehaze` y `enhance` avanzan, mientras `denoise` cae 2,52 dB. El routing sigue siendo perfecto (accuracy 1, confianza 1, entropía 0) y la exposición fue uniforme, por lo que el cuello de botella está en la capacidad/eficiencia de aprendizaje por experto, no en el router ni en el sampler. Cada experto ve sólo aproximadamente una quinta parte de las muestras; esto puede explicar la regresión de `denoise` frente a la cabeza compartida.
+1. ejecutar `MAXIM(..., return_features=True)`;
+2. tomar el feature map del último decoder antes de la reconstrucción final, con forma `[B, H, W, C]`;
+3. interpretarlo como `N = H × W` tokens de dimensión `C`, obteniendo `[B, N, C]`;
+4. aplicar el mismo router liviano a cada token, sin mezclar tokens y sin global pooling;
+5. producir logits `[B, N, K]` y seleccionar `TOP_K=2` expertos de forma independiente para cada token;
+6. aplicar expertos de features con contrato `R^C → R^C` a los tokens seleccionados;
+7. combinar las salidas top-2 con sus gates normalizados;
+8. restaurar el feature map `[B, H, W, C]`;
+9. usar conexión residual en features y luego una cabeza de reconstrucción compartida para generar RGB.
 
-### Arquitectura seleccionada para la siguiente prueba
+Forma conceptual:
 
-La próxima arquitectura conservará una cabeza de reconstrucción compartida equivalente a la salida de MAXIM y añadirá expertos residuales que aprenderán solamente correcciones condicionadas:
+`F [B,H,W,C] → tokens Z [B,N,C] → router [B,N,K] → top-2 token experts → Z' [B,N,C] → F' → shared output head → RGB`
 
-```text
-features F = MAXIM_S2(x)
-base       = H_shared(F)
-correction = sum_e p_e(F) * DeltaE_e(F)
-y_hat      = x + base + correction
-```
+No debe entrar al router:
 
-Componentes y motivación:
+- la imagen RGB;
+- `task_id`;
+- una representación promediada de toda la imagen.
 
-- `H_shared` recibe todas las muestras y conserva el conocimiento común de restauración aprendido por MAXIM.
-- Cada `DeltaE_e` es un bloque residual pequeño; no debe reconstruir por sí solo la imagen completa.
-- El router produce los pesos `p_e` sin recibir la etiqueta de tarea en el experimento de especialización latente.
-- Si las correcciones se inicializan cerca de cero, el modelo comienza funcionalmente en el comportamiento de la baseline en vez de degradarlo al introducir el MoE.
-- La salida residual global `x + ...` se mantiene compatible con MAXIM.
-- La hipótesis es que esta estructura evita que cada experto dependa únicamente de aproximadamente 20 % de los ejemplos, que es la principal limitación observada en el MoE rígido tarea→experto.
+Los expertos de esta branch deben operar en el espacio de features. Las cabezas convolucionales que producen una imagen RGB completa por experto no implementan token routing y no deben reutilizarse como si fueran expertos por token. La implementación recomendada es un MLP residual por experto, por ejemplo `Dense(C→rC) → GELU → Dense(rC→C)`, o su equivalente pointwise `1×1`.
 
-La implementación quedó en `maxim/models/moe.py` como `SharedResidualMaximMoE`. La rama base de MAXIM permanece activa para todas las muestras y los expertos usan `ResidualExpertHead(zero_init_output=True)`, por lo que su contribución inicial es cero. La notebook `maxim/moeTrainer.ipynb` usa `EXPERT_HEAD_VARIANT="shared_residual"`, `CORRECTION_SCALE=1.0` y el directorio `v3_shared_residual_head`. La inicialización desde `best_checkpoint/checkpoint_28` queda como siguiente ajuste para una corrida warm-start; esta primera implementación conserva la ruta de inicialización actual y permite validar la arquitectura de forma aislada.
+Los tokens ya contienen contexto espacial extraído por MAXIM. El primer experimento debe permitir que el gradiente de reconstrucción atraviese el router y llegue al backbone; si aparece inestabilidad se agregará como ablación una opción `ROUTER_STOP_GRADIENT`, pero no debe quedar activada por defecto sin evidencia.
 
-La branch de respaldo `exp/latent-experts-k8` fue creada desde el commit `9fbeb31` (`v2 training`) y no contiene todavía la implementación de la cabeza compartida. El trabajo experimental actual continúa en `main`, como se decidió.
+### Evitar nuevamente expertos muertos
 
-### Branch experimental de especialización latente
+El routing por token aumenta el conjunto de decisiones de balance desde `B` imágenes hasta `B × N` tokens, pero el hard top-k todavía puede dejar expertos muertos. En la misma branch se debe:
 
-Branch propuesta: `exp/latent-experts-k8`.
+1. conservar las probabilidades densas `dense_router_probs` antes del top-k;
+2. calcular la pérdida de balance sobre esas probabilidades densas, no sobre gates ya enmascarados;
+3. devolver por separado `dense_router_probs` y `sparse_gates` para métricas;
+4. agregar exploración durante entrenamiento mediante ruido pequeño en logits o noisy top-k;
+5. implementar un warm-up configurable del routing: recomendado dos épocas densas o top-4 y luego top-2;
+6. mantener top-2 determinista durante validación/test;
+7. emitir una advertencia si un experto permanece por debajo de 1 % de los tokens durante tres épocas consecutivas;
+8. si se implementa capacidad finita por experto, registrar `capacity_factor`, tokens descartados y política de overflow.
 
-La branch debe permitir parametrizar `NUM_EXPERTS` para ejecutar como mínimo:
+Aunque el batch de imágenes sea 2, el balance ahora se estima sobre todos los tokens del batch. La agregación y la normalización deben usar el número real de tokens, no sólo la cantidad de imágenes.
 
-1. `K=5`, routing aprendido: control que separa el efecto del nuevo routing del efecto de agregar expertos.
-2. `K=8`, routing aprendido: experimento principal con más expertos que tareas.
+### Métricas del router
 
-Configuración inicial propuesta:
+Registrar por separado:
 
-- routing aprendido sin `task_id` y sin pérdida de clasificación de tarea;
-- selección top-2, no top-1 rígido;
-- routing preferentemente por patches/features espaciales para permitir que una misma imagen use varias especialidades;
-- cabeza compartida siempre activa;
-- expertos residuales ligeros;
-- temperatura alta al comienzo y annealing gradual;
-- regularización de balance calculada sobre patches o estadísticas acumuladas entre pasos, no sólo sobre batch, porque el batch size es 2;
-- registrar tanto utilización soft como frecuencia top-1/top-2;
-- analizar después del entrenamiento la asociación de cada experto con tarea, severidad, brillo, contraste, textura y frecuencia espacial.
+- uso soft denso global por token;
+- carga sparse global por token;
+- frecuencia de inclusión top-2 por token, no sólo frecuencia top-1;
+- matriz tarea × experto agregando tokens, sólo para análisis posterior;
+- entropía por token y promedio por imagen;
+- entropía de la distribución global media;
+- expertos efectivos por token y expertos efectivos globales;
+- porcentaje de tokens asignados a cada par top-2;
+- expertos con gradiente y norma media del gradiente por época.
 
-No se impondrá inicialmente que los expertos sean estadísticamente independientes de las tareas. La ausencia de `task_id` garantiza que la asignación no está cableada; cualquier correlación tarea→experto será una especialización aprendida que deberá analizarse, no un error por sí misma.
+Para demostrar especialización más allá de reconocer la tarea, agregar análisis dentro de cada tarea: posición espacial, magnitud/energía del feature, bordes/textura y severidad de degradación cuando exista esa metadata.
 
-### Comparación provisional con MoE
+### Eficiencia
 
-Como referencia histórica, antes del reentrenamiento del MoE se había comparado la baseline de la época 28 con un routing oracle medido antes de ampliar `denoise`. Esa comparación queda reemplazada por la sección anterior para las conclusiones principales.
+La implementación semántica mínima puede evaluar los ocho expertos sobre todos los tokens y aplicar luego los gates top-2. Eso permite validar token routing, pero no reduce cómputo. La versión verdaderamente sparse debe despachar/gather tokens por experto y recomponerlos con scatter, usando shapes estáticos compatibles con JAX y una política explícita de capacidad/overflow. No mezclar la optimización de ejecución con la primera validación funcional.
 
-| Tarea | MAXIM sin MoE | MoE oracle histórico | Diferencia MAXIM−MoE |
-|---|---:|---:|---:|
-| deblur | 24,554 | 24,635 | −0,081 |
-| dehaze | 42,824 | 41,782 | +1,042 |
-| denoise | 38,087 | 39,036 | −0,949 |
-| derain | 26,428 | 26,887 | −0,459 |
-| enhance | 22,216 | 21,938 | +0,278 |
-| **Global ponderado** | **27,455** | **25,384** | **+2,071** |
+### Pruebas de aceptación
 
-La lectura histórica no debe usarse para la tabla final de resultados.
+- El router debe recibir exclusivamente tokens `[B,N,C]` derivados del feature map.
+- No debe existir global average pooling sobre `H×W` antes del router.
+- Shapes correctos para batch 1 y batch 2 y para al menos dos tamaños espaciales válidos.
+- Los logits y gates deben tener forma `[B,N,K]`, nunca `[B,K]`.
+- `dense_router_probs` suma 1 y tiene ocho valores positivos por token.
+- `sparse_gates` suma 1 y tiene exactamente `TOP_K` valores no nulos por token.
+- El balance denso debe producir gradiente para los ocho logits del router.
+- Durante un smoke test deben observarse gradientes finitos y no nulos en el router y en los expertos seleccionados.
+- Dos tokens de una misma imagen deben poder seleccionar pares de expertos distintos en un test controlado.
+- La salida reconstruida debe conservar la resolución y el contrato RGB de MAXIM.
+- Reiniciar desde cero en un `OUTPUT_DIR` nuevo; no restaurar el checkpoint K=8 colapsado.
 
-## Notebooks preparados
+## Bloque 3 — Cabeza compartida inicializada desde baseline
 
-### `maxim/moeExperimentRunner.ipynb`
+Este bloque se implementará en el notebook de cabeza compartida sobre `main` o una branch nueva derivada de `main`, sin mezclar todavía los cambios experimentales del router K=8.
 
-Este archivo reemplaza a `maxim/moeFineTune.ipynb` como runner de pruebas del MoE.
+### Inicialización
 
-Configuración predeterminada segura:
+1. Elegir un checkpoint baseline fuente y registrar ruta, época, métrica y hash/configuración.
+2. Cargar todos los parámetros compatibles del backbone y de las salidas auxiliares.
+3. Copiar la convolución de salida baseline a la cabeza compartida.
+4. Inicializar la última convolución de cada corrección residual en cero, de modo que inicialmente:
 
-- `RUN_DATASET_SMOKE_TEST=True`;
-- `START_TRAINING=False`;
-- valida 4.450/767 entradas de `denoise`, ausencia de duplicados e intersección y hashes de las listas;
-- construye el loader real y decodifica batches de train y test desde Drive;
-- comprueba shapes `256×256×3`, valores finitos y rango `[0,1]`;
-- con **Run all**, las celdas de modelo, checkpoint y entrenamiento se omiten mientras `START_TRAINING=False`.
+   `salida_MoE = salida_baseline + 0`
 
-Smoke test aprobado en Colab: 4.450 entradas train y 767 test únicas, ambos SHA-256 correctos, 0 archivos faltantes en `imgs/` y `GT/`, y decodificación correcta de 8 muestras train y 4 test mediante el loader real. Resultado final: `DENOISE DATASET SMOKE TEST PASSED`.
+5. Comprobar con una entrada fija y `train=False` que la diferencia máxima entre baseline y MoE inicial sea menor que `1e-6`.
+6. Fallar si la cobertura de parámetros cargados no coincide con la esperada; no aceptar warm starts parciales silenciosos.
 
-Para una corrida posterior se debe elegir un `OUTPUT_DIR` nuevo, revisar `SOURCE_CHECKPOINT_DIR` y cambiar `START_TRAINING=True`. El fine-tuning con SIDD ampliado es una prueba adicional y no sustituye una corrida MoE desde cero para la comparación principal.
+### Comparación justa por presupuesto adicional
 
-### `maxim/maximTrainer_no_moe.ipynb`
+Definir una única constante `EXTRA_EPOCHS` antes de mirar los resultados. Valor recomendado inicial: **10 épocas**, equivalentes a 20.000 pasos adicionales.
 
-Preparado como baseline MAXIM S-2 comparable:
+Crear dos corridas desde exactamente el mismo checkpoint baseline:
 
-- mismas versiones JAX/Flax, seed, batch size 2, crop 256, dropout 0.1 y weight decay `1e-4`;
-- 30 épocas, 2.000 pasos por época, LR `2e-4` y warmup de tres épocas;
-- inicialización aleatoria, sin restaurar el baseline anterior;
-- mismo pipeline de carga y augmentations que el MoE;
-- muestreo uniforme correcto, repitiendo cada tarea antes de mezclar;
-- misma pérdida profunda normalizada: L1 final + promedio ponderado de cinco auxiliares;
-- validación exhaustiva y determinista de 4.448 pares;
-- PSNR/L1 globales y por tarea, PSNR macro y conteos por tarea;
-- no contiene validaciones estructurales ni conteos esperados hardcodeados del dataset; esas comprobaciones pertenecen exclusivamente a `moeExperimentRunner.ipynb`;
-- checkpoints y `training.log` bajo el `OUTPUT_DIR` configurado;
-- `RUN_SANITY_CHECK=True`; revisar `START_TRAINING` y el nombre de salida antes de usar **Run all**.
+- **Control baseline continuado:** baseline + `EXTRA_EPOCHS`.
+- **MoE cabeza compartida:** baseline inicial + cabeza compartida/residuales + `EXTRA_EPOCHS`.
 
-La corrida final completó las 30 épocas. El sistema de reanudación utilizado:
+Para que la comparación sea limpia:
 
-- elegir entre `none`, `latest`, `best` y `specific` sin construir rutas duplicadas;
-- restaurar parámetros, `batch_stats`, momentos del optimizador y `state.step`;
-- derivar las épocas completas desde `state.step / steps_per_epoch` y comprobar que coincidan con el nombre del checkpoint;
-- recuperar `best_psnr` y su época desde `best_metric.json`;
-- impedir que una métrica peor sobrescriba el mejor checkpoint histórico;
-- guardar cada nuevo mejor modelo también en el directorio plano usado por `latest`.
+- restaurar los mismos parámetros fuente en ambas corridas;
+- crear un optimizador nuevo en ambas, porque la arquitectura MoE no puede heredar de forma idéntica el estado completo del optimizador baseline;
+- usar el mismo LR, schedule, warm-up, weight decay, orden de datos, seed y número de pasos;
+- decidir y documentar si todo el backbone queda entrenable; por defecto, entrenar conjuntamente backbone, cabeza compartida y expertos;
+- reportar tanto el resultado absoluto como la mejora o regresión respecto del checkpoint inicial.
 
-Las reanudaciones observadas fueron coherentes con los checkpoints disponibles. El artefacto que debe conservarse para evaluación final es `best_checkpoint/checkpoint_28`; `checkpoint_30` representa el final del entrenamiento, pero no el mejor resultado de validación.
+No comparar directamente baseline de 30 épocas contra MoE con 30 épocas baseline más épocas adicionales. El control válido es baseline continuado durante el mismo presupuesto extra.
 
-## Handoff de implementación
+### Checkpoints y salidas
 
-### Decisión tomada
+Usar directorios nuevos y separados, por ejemplo:
 
-No continuar optimizando la arquitectura donde cada experto reemplaza completamente la cabeza final y está asignado rígidamente a una tarea. El oracle ya mostró que ese diseño no supera la baseline global y que aumentar la capacidad aislada de las cabezas no resuelve la pérdida de eficiencia por experto.
+- `baseline_S-2_from_ckpt_extra10`;
+- `moe_shared_residual_from_baseline_extra10`.
 
-El siguiente camino principal es **MAXIM con cabeza compartida más expertos residuales de especialización latente**. El router supervisado de cinco tareas queda reservado como ablación para medir la diferencia entre routing oracle y routing aprendido, pero no bloquea este experimento.
+Guardar en ambos:
 
-### Orden de trabajo
+- checkpoint inicial evaluado;
+- mejor checkpoint macro de validación;
+- último checkpoint;
+- métricas ponderada/macro y por tarea;
+- configuración completa y procedencia del checkpoint fuente;
+- tiempo por paso, tiempo de evaluación y memoria pico si está disponible.
 
-1. Crear la branch `exp/latent-experts-k8` desde el estado estable actual. **Completado:** apunta a `9fbeb31` y el trabajo continúa en `main`.
-2. Implementar `SharedResidualMoEHead` sin cambiar inicialmente el backbone ni las cinco salidas auxiliares. **Completado en `main`:** implementado como `SharedResidualMaximMoE`.
-3. Añadir una prueba de equivalencia: con todas las correcciones anuladas, la nueva salida debe coincidir numéricamente con MAXIM cargado desde `best_checkpoint/checkpoint_28`. **Pendiente:** requiere cargar el checkpoint de la baseline y ejecutar JAX en Colab.
-4. Implementar router sin etiquetas con `NUM_EXPERTS`, `TOP_K` y temperatura configurables.
-5. Ejecutar preflight de shapes, carga de checkpoint, gradientes y decodificación completa del dataset.
-6. Ejecutar un smoke training corto con `K=5`, comprobando que la pérdida baja, que todos los expertos reciben gradiente y que no aparecen valores no finitos.
-7. Ejecutar el mismo smoke test con `K=8` y revisar utilización, entropía, expertos efectivos y distribución por tarea.
-8. Realizar una corrida piloto con backbone congelado al comienzo y después descongelado con LR menor que expertos/router.
-9. Sólo si no hay colapso y el modelo conserva el rendimiento inicial de la baseline, ejecutar las corridas completas comparables K=5 y K=8.
-10. Como control de presupuesto, continuar el checkpoint baseline durante la misma cantidad adicional de pasos que reciba el MoE inicializado desde él.
-11. Después de seleccionar K y routing, ejecutar ablaciones de top-1/top-2, temperatura y coeficiente de balance.
-12. Ejecutar el router supervisado tarea→experto como ablación secundaria y actualizar la tesis con resultados, curvas, heatmaps y costo computacional.
+### Pruebas de aceptación
 
-### Condiciones para detener o corregir una corrida piloto
+- Equivalencia inicial baseline/MoE menor que `1e-6`.
+- Conteo exacto de pasos adicionales igual en ambas corridas.
+- Mismo split y mismo protocolo de métricas.
+- Ningún checkpoint previo debe ser sobrescrito.
+- La corrida debe poder reanudarse conservando correctamente `EXTRA_EPOCHS`, paso global y criterio de mejor checkpoint.
 
-- algún experto no recibe gradientes o queda sin uso durante varias evaluaciones;
-- el número de expertos efectivos colapsa de forma persistente cerca de 1;
-- el router satura prematuramente con confianza cercana a 1 antes de que los expertos se diferencien;
-- la salida inicial no reproduce la baseline cuando las correcciones están anuladas;
-- aparecen regresiones grandes antes de descongelar el backbone;
-- aumenta el costo sin una comparación K=5 equivalente que permita atribuir la mejora.
+## Orden de trabajo para Codex
+
+1. Crear una branch/commit común de métricas y tests.
+2. Aplicar esas métricas al baseline, K=5, K=8 y cabeza compartida.
+3. Implementar soporte `val/test` sin generar un split silenciosamente.
+4. En `exp/latent-experts-k8`, implementar token-choice `[B,N,K]` sobre features, expertos `C→C`, balance denso y top-2 por token.
+5. Ejecutar tests unitarios y un smoke test corto del K=8; no lanzar todavía una corrida completa si aparecen expertos muertos.
+6. En la branch de cabeza compartida, implementar warm start exacto desde baseline.
+7. Preparar los dos notebooks de continuación con `EXTRA_EPOCHS=10`: baseline control y MoE compartido.
+8. Verificar equivalencia inicial, presupuesto y directorios de salida.
+9. Sólo después de esos chequeos, lanzar las corridas completas.
 
 ## Criterios para corridas comparables
 
-- Mismo split, seed, crop, augmentations, batch size, arquitectura S-2 y presupuesto.
-- Muestreo uniforme entre tareas durante train; validación completa concatenada sin sampling.
+- Mismo split, seed, crop, augmentations, batch size, arquitectura S-2 y presupuesto de pasos.
+- Muestreo uniforme entre tareas durante train.
+- Validación exhaustiva y determinista, separada del test final.
 - Mismos pesos de supervisión profunda.
 - Cero pares faltantes y conteos exactos por tarea.
-- Reportar PSNR/SSIM global ponderado, macro y por tarea.
-- En corridas inicializadas desde la baseline, comparar contra una continuación de la baseline con el mismo número de pasos adicionales.
-- Reportar parámetros totales, parámetros activos, FLOPs aproximados, tiempo por paso y memoria pico.
-- Para routing latente, reportar utilización soft, top-1/top-2, entropía, expertos efectivos y matrices tarea×experto.
-- Guardar entorno, logs, checkpoints y diagnósticos reproducibles.
+- Reportar PSNR ponderado, macro y por tarea; añadir SSIM bajo el mismo esquema cuando se implemente.
+- Guardar entorno, commit, configuración, logs, checkpoints y diagnósticos reproducibles.
+- Tratar diferencias menores a 0,1 dB como empate técnico mientras exista una sola seed.
 
-## Riesgos activos
+## Riesgos y detalles a no olvidar
 
-- El router puede aprender atajos de dataset/cámara en lugar de propiedades de degradación.
-- Con K=8 y batch size 2, una pérdida de balance calculada únicamente por batch es estadísticamente inadecuada; debe operar sobre patches o acumulación temporal.
-- Expertos idénticos y una contribución inicial exactamente nula pueden producir simetría o gradientes débiles para el router; usar pequeñas diferencias de inicialización y verificar gradientes.
-- Top-2 incrementa el cómputo activo; la comparación debe incluir costo y no sólo parámetros totales.
-- La especialización emergente puede seguir correlacionándose con las cinco tareas; esto debe medirse antes de introducir restricciones que podrían perjudicar la calidad.
-- El PSNR global ponderado puede ocultar regresiones en tareas pequeñas.
-- Las lecturas directas desde Drive pueden fallar transitoriamente aun con archivos válidos; preferir copiar el dataset a almacenamiento local de Colab o reforzar reintentos y preflight de decodificación completa.
-- Cambios automáticos de dependencias de Colab pueden romper reproducibilidad; conservar el pin JAX/Flax.
+- La evaluación histórica usó `test.txt` para elegir checkpoints; debe declararse y no confundirse con un test final ciego.
+- Crear un `val.txt` desde train cambia el protocolo y obliga a repetir las comparaciones finales bajo el nuevo split.
+- El macro corrige la ponderación entre tareas, pero no la baja representatividad de `enhance` con 30 imágenes.
+- El router por token puede seguir aprendiendo atajos de dataset; analizar asignaciones dentro de cada tarea y dentro de cada imagen, no sólo tarea × experto.
+- Top-2 con hard mask puede dejar expertos sin gradiente; el balance pre-top-k y la exploración son obligatorios.
+- Batch size 2 limita la diversidad de imágenes por batch, aunque el balance por token use `B×N` observaciones.
+- La corrida K=8 actual calcula los ocho expertos aunque sólo mezcle dos.
+- Hubo fallas transitorias leyendo imágenes desde Drive. Antes de corridas largas, copiar o cachear el dataset en almacenamiento local y validar decodificación.
+- Reanudar una época desde checkpoint no reprodujo exactamente el mismo resultado; registrar estado del pipeline y seeds de TensorFlow/NumPy/JAX.
+- Mantener versiones fijadas de JAX, Flax, Optax y TensorFlow en Colab.
+- No mezclar cambios de métricas, router y cabeza compartida en una sola corrida sin controles intermedios.
