@@ -69,6 +69,125 @@ class ResidualExpertHead(nn.Module):
         )(h)
 
 
+class TokenRouter(nn.Module):
+    """Shared per-token router with no spatial or cross-token pooling."""
+
+    num_experts: int
+    hidden_features: int = 128
+
+    @nn.compact
+    def __call__(self, tokens):
+        if tokens.ndim != 3:
+            raise ValueError(
+                f"TokenRouter expects [B, N, C], got shape {tokens.shape}."
+            )
+        x = nn.LayerNorm(name="input_norm")(tokens)
+        x = nn.Dense(self.hidden_features, name="hidden")(x)
+        x = nn.gelu(x)
+        return nn.Dense(self.num_experts, name="logits")(x)
+
+
+class TokenExpert(nn.Module):
+    """Residual MLP expert mapping each feature token from C to C."""
+
+    hidden_multiplier: float = 2.0
+
+    @nn.compact
+    def __call__(self, tokens):
+        if tokens.ndim != 3:
+            raise ValueError(
+                f"TokenExpert expects [B, N, C], got shape {tokens.shape}."
+            )
+        channels = tokens.shape[-1]
+        hidden_features = max(1, int(channels * self.hidden_multiplier))
+        x = nn.LayerNorm(name="input_norm")(tokens)
+        x = nn.Dense(hidden_features, name="hidden")(x)
+        x = nn.gelu(x)
+        return nn.Dense(channels, name="output")(x)
+
+
+def normalized_top_k_gates(logits, dense_probs, top_k):
+    """Mask and renormalize probabilities independently for every token."""
+    num_experts = logits.shape[-1]
+    if not 1 <= top_k <= num_experts:
+        raise ValueError(
+            f"top_k must be in [1, {num_experts}], got {top_k}."
+        )
+    if top_k == num_experts:
+        return dense_probs
+    _, top_indices = jax.lax.top_k(logits, top_k)
+    mask = jnp.sum(
+        jax_nn.one_hot(top_indices, num_experts, dtype=dense_probs.dtype),
+        axis=-2,
+    )
+    sparse_gates = dense_probs * mask
+    return sparse_gates / jnp.sum(sparse_gates, axis=-1, keepdims=True)
+
+
+class TokenChoiceMaximMoE(nn.Module):
+    """MAXIM with independent top-k expert selection for every feature token.
+
+    The router sees only the final decoder features. Experts transform tokens
+    in feature space (C -> C); their weighted residual is reshaped to a feature
+    map and reconstructed by one shared RGB head.
+    """
+
+    maxim: MAXIM
+    router: TokenRouter
+    experts: list[TokenExpert]
+    shared_output_head: ExpertHead
+    top_k: int = 2
+    temperature: float = 1.0
+    router_noise_std: float = 0.0
+
+    def __call__(self, x, train=True, dense_routing=False):
+        num_experts = len(self.experts)
+        if num_experts < 1:
+            raise ValueError("TokenChoiceMaximMoE requires at least one expert.")
+        if self.router.num_experts != num_experts:
+            raise ValueError(
+                "Router/expert count mismatch: "
+                f"{self.router.num_experts} router outputs for {num_experts} experts."
+            )
+        if self.temperature <= 0:
+            raise ValueError("temperature must be positive.")
+
+        outputs_all, features = self.maxim(x, train=train, return_features=True)
+        batch, height, width, channels = features.shape
+        tokens = features.reshape(batch, height * width, channels)
+
+        router_logits = self.router(tokens)
+        routing_logits = router_logits
+        if train and self.router_noise_std > 0:
+            routing_logits = routing_logits + self.router_noise_std * jax.random.normal(
+                self.make_rng("routing"), routing_logits.shape
+            )
+        dense_router_probs = nn.softmax(
+            routing_logits / self.temperature, axis=-1
+        )
+        sparse_gates = normalized_top_k_gates(
+            routing_logits, dense_router_probs, self.top_k
+        )
+        mixture_gates = jnp.where(
+            jnp.asarray(dense_routing), dense_router_probs, sparse_gates
+        )
+
+        mixed_residual = jnp.zeros_like(tokens)
+        for expert_index, expert in enumerate(self.experts):
+            expert_residual = expert(tokens)
+            mixed_residual = mixed_residual + (
+                mixture_gates[..., expert_index, None] * expert_residual
+            )
+        routed_features = (tokens + mixed_residual).reshape(
+            batch, height, width, channels
+        )
+        final_prediction = self.shared_output_head(routed_features) + x
+
+        predictions = [list(stage_outputs) for stage_outputs in outputs_all]
+        predictions[-1][-1] = final_prediction
+        return predictions, dense_router_probs, sparse_gates
+
+
 class MaximMoE(nn.Module):
     """MAXIM with deep supervision and an MoE final reconstruction head."""
 

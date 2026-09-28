@@ -25,8 +25,8 @@ Las siguientes iteraciones se harán en tres bloques, en este orden:
 | MoE oracle K=5 residual | Completado | 27,114 dB ponderado y 30,980 dB macro |
 | MoE K=5 con cabeza compartida | Completado | 27,350 dB ponderado y 30,720 dB macro |
 | MoE latente K=8 top-2 | Completado | 27,060 dB ponderado y 30,800 dB macro; cuatro de ocho expertos quedaron inactivos |
-| Corrección del protocolo de métricas | Siguiente | Separar ponderado/macro, criterio de checkpoint y funciones de validación/test |
-| MoE token-choice K=8 sobre features | Pendiente | Enrutar cada token del feature map por separado; sin pooling global ni gate único por imagen |
+| Corrección del protocolo de métricas | Completado | Ponderado/macro explícitos, selección por validación, test final separado y splits agrupados verificados en Drive |
+| MoE token-choice K=8 sobre features | Implementado; smoke pendiente | Router y gates `[B,N,K]`, expertos `C→C`, top-2 por token, balance denso, exploración y warm-up denso |
 | Cabeza compartida inicializada desde baseline | Pendiente | Cargar parámetros baseline, inicializar residuales en cero y entrenar con control baseline de igual presupuesto adicional |
 
 ## Datasets finales
@@ -264,11 +264,11 @@ Guardar en ambos:
 
 ## Orden de trabajo para Codex
 
-1. Crear una branch/commit común de métricas y tests.
-2. Aplicar esas métricas al baseline, K=5, K=8 y cabeza compartida.
-3. Implementar soporte `val/test` sin generar un split silenciosamente.
-4. En `exp/latent-experts-k8`, implementar token-choice `[B,N,K]` sobre features, expertos `C→C`, balance denso y top-2 por token.
-5. Ejecutar tests unitarios y un smoke test corto del K=8; no lanzar todavía una corrida completa si aparecen expertos muertos.
+1. Crear una branch/commit común de métricas y tests. **Completado.**
+2. Aplicar esas métricas al baseline, K=5, K=8 y cabeza compartida. **Completado.**
+3. Implementar soporte `val/test` sin generar un split silenciosamente. **Completado y verificado en Drive.**
+4. En `exp/latent-experts-k8`, implementar token-choice `[B,N,K]` sobre features, expertos `C→C`, balance denso y top-2 por token. **Implementado.**
+5. Ejecutar tests unitarios y un smoke test corto del K=8; no lanzar todavía una corrida completa si aparecen expertos muertos. **Tests locales aprobados; smoke JAX/Colab pendiente.**
 6. En la branch de cabeza compartida, implementar warm start exacto desde baseline.
 7. Preparar los dos notebooks de continuación con `EXTRA_EPOCHS=10`: baseline control y MoE compartido.
 8. Verificar equivalencia inicial, presupuesto y directorios de salida.
