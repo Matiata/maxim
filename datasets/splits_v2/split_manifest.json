@@ -1,0 +1,244 @@
+{
+  "seed": 42,
+  "validation_fraction": 0.1,
+  "tasks": {
+    "deblur": {
+      "task": "deblur",
+      "seed": 42,
+      "validation_fraction": 0.1,
+      "counts": {
+        "train": 7812,
+        "val": 868,
+        "test": 3150
+      },
+      "group_counts": {
+        "train": 239,
+        "val": 26,
+        "test": 46
+      },
+      "sha256": {
+        "train": "9a2a5b0d07b3b5191c169f739bc1ac1c36b5504475cec49b487f422f206c8556",
+        "val": "2a0cae3d5174e3adf97b974e6618876c2fb9c1186e5b5b78794259af3267798c",
+        "test": "1e10941c7d66a7d965f403ea1cb629973e136263a3055f646b269717a1782c00"
+      },
+      "historical_train_samples_moved_to_test_for_group_closure": 0,
+      "historical_train_groups_moved_to_test": 0,
+      "historical_train_group_ids_moved_to_test": [],
+      "strata": {
+        "gopro-sequence": {
+          "available_groups": 22,
+          "available_samples": 2102,
+          "validation_groups": 2,
+          "validation_samples": 210,
+          "target_samples": 210
+        },
+        "gopro-video": {
+          "available_groups": 32,
+          "available_samples": 6367,
+          "validation_groups": 3,
+          "validation_samples": 637,
+          "target_samples": 637
+        },
+        "realblur": {
+          "available_groups": 211,
+          "available_samples": 211,
+          "validation_groups": 21,
+          "validation_samples": 21,
+          "target_samples": 21
+        }
+      }
+    },
+    "dehaze": {
+      "task": "dehaze",
+      "seed": 42,
+      "validation_fraction": 0.1,
+      "counts": {
+        "train": 561,
+        "val": 66,
+        "test": 383
+      },
+      "group_counts": {
+        "train": 423,
+        "val": 45,
+        "test": 84
+      },
+      "sha256": {
+        "train": "89bd2f54550404f9d3ab46871cf6a6479da9ccd6b6b94c42cee1549947ab7827",
+        "val": "e2683e5bfffbc93b7851e13b6df11454de0d446ce83213c70129eca6a5eef8d4",
+        "test": "4ccb46026dfca10659bbac3a0e274c92e7fa11970b010072a479deec02a9873c"
+      },
+      "historical_train_samples_moved_to_test_for_group_closure": 282,
+      "historical_train_groups_moved_to_test": 35,
+      "historical_train_group_ids_moved_to_test": [
+        "sots_indoor_1401",
+        "sots_indoor_1403",
+        "sots_indoor_1404",
+        "sots_indoor_1405",
+        "sots_indoor_1406",
+        "sots_indoor_1407",
+        "sots_indoor_1409",
+        "sots_indoor_1410",
+        "sots_indoor_1411",
+        "sots_indoor_1415",
+        "sots_indoor_1416",
+        "sots_indoor_1417",
+        "sots_indoor_1418",
+        "sots_indoor_1419",
+        "sots_indoor_1420",
+        "sots_indoor_1421",
+        "sots_indoor_1426",
+        "sots_indoor_1428",
+        "sots_indoor_1429",
+        "sots_indoor_1430",
+        "sots_indoor_1431",
+        "sots_indoor_1432",
+        "sots_indoor_1434",
+        "sots_indoor_1435",
+        "sots_indoor_1436",
+        "sots_indoor_1438",
+        "sots_indoor_1439",
+        "sots_indoor_1440",
+        "sots_indoor_1441",
+        "sots_indoor_1443",
+        "sots_indoor_1444",
+        "sots_indoor_1445",
+        "sots_indoor_1447",
+        "sots_outdoor_0051",
+        "sots_outdoor_0320"
+      ],
+      "strata": {
+        "hsts": {
+          "available_groups": 9,
+          "available_samples": 9,
+          "validation_groups": 1,
+          "validation_samples": 1,
+          "target_samples": 1
+        },
+        "sots-indoor": {
+          "available_groups": 17,
+          "available_samples": 170,
+          "validation_groups": 2,
+          "validation_samples": 20,
+          "target_samples": 17
+        },
+        "sots-outdoor": {
+          "available_groups": 442,
+          "available_samples": 448,
+          "validation_groups": 42,
+          "validation_samples": 45,
+          "target_samples": 45
+        }
+      }
+    },
+    "denoise": {
+      "task": "denoise",
+      "seed": 42,
+      "validation_fraction": 0.1,
+      "counts": {
+        "train": 3987,
+        "val": 463,
+        "test": 767
+      },
+      "group_counts": {
+        "train": 127,
+        "val": 14,
+        "test": 17
+      },
+      "sha256": {
+        "train": "8fc97cda0cfb50cb800b3b874836419710ab3a70f4acd991b205424d847e2733",
+        "val": "55c42c0d9f399903ce432e01d75eb00461d74278ffe4bc100d65183e85eaa0ec",
+        "test": "45fb0b36422f23d017ec2d95957043c2b64301e9423d16766f594cab618ed419"
+      },
+      "historical_train_samples_moved_to_test_for_group_closure": 0,
+      "historical_train_groups_moved_to_test": 0,
+      "historical_train_group_ids_moved_to_test": [],
+      "strata": {
+        "sidd-full": {
+          "available_groups": 29,
+          "available_samples": 4338,
+          "validation_groups": 3,
+          "validation_samples": 452,
+          "target_samples": 434
+        },
+        "sidd-legacy": {
+          "available_groups": 112,
+          "available_samples": 112,
+          "validation_groups": 11,
+          "validation_samples": 11,
+          "target_samples": 11
+        }
+      }
+    },
+    "derain": {
+      "task": "derain",
+      "seed": 42,
+      "validation_fraction": 0.1,
+      "counts": {
+        "train": 3240,
+        "val": 360,
+        "test": 400
+      },
+      "group_counts": {
+        "train": 1620,
+        "val": 180,
+        "test": 200
+      },
+      "sha256": {
+        "train": "b121b7a2dc7f1ac2e4f854ebe837847a26ad57270d159db435a201a97901b8bd",
+        "val": "38e94fbfe3508d7c373deb5ac0f7c59a18064c656baf045b1db59c3470d22557",
+        "test": "5762ed7ecafe1dc00d87dc2d85dcb00be17369f6cfcafcc39d17b0df7e182012"
+      },
+      "historical_train_samples_moved_to_test_for_group_closure": 0,
+      "historical_train_groups_moved_to_test": 0,
+      "historical_train_group_ids_moved_to_test": [],
+      "strata": {
+        "rain": {
+          "available_groups": 1800,
+          "available_samples": 3600,
+          "validation_groups": 180,
+          "validation_samples": 360,
+          "target_samples": 360
+        }
+      }
+    },
+    "enhance": {
+      "task": "enhance",
+      "seed": 42,
+      "validation_fraction": 0.1,
+      "counts": {
+        "train": 4923,
+        "val": 546,
+        "test": 30
+      },
+      "group_counts": {
+        "train": 4923,
+        "val": 546,
+        "test": 30
+      },
+      "sha256": {
+        "train": "3c2e412e85538424e20d912525e36a7990abed179470fdd5db993f3cea0beeb7",
+        "val": "5ffdbe92a2f490449603279679bcb08c8b11eeea1bd3cb576b53e6337e24fb53",
+        "test": "135c13a51a49b27b4320f8c96b55a0fcfcf4af63bb7fd2b0abea3dd9f3775464"
+      },
+      "historical_train_samples_moved_to_test_for_group_closure": 0,
+      "historical_train_groups_moved_to_test": 0,
+      "historical_train_group_ids_moved_to_test": [],
+      "strata": {
+        "fivek": {
+          "available_groups": 4984,
+          "available_samples": 4984,
+          "validation_groups": 498,
+          "validation_samples": 498,
+          "target_samples": 498
+        },
+        "lol": {
+          "available_groups": 485,
+          "available_samples": 485,
+          "validation_groups": 48,
+          "validation_samples": 48,
+          "target_samples": 48
+        }
+      }
+    }
+  }
+}
