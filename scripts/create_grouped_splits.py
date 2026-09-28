@@ -209,6 +209,7 @@ def create_task_split(
     moved_to_test = [
         name for name in train_names if original_split[name] == "train" and assignment[name] == "test"
     ]
+    moved_test_groups = sorted({classify(task, name)[0] for name in moved_to_test})
     metadata = {
         "task": task,
         "seed": seed,
@@ -217,9 +218,8 @@ def create_task_split(
         "group_counts": {split: len(groups) for split, groups in split_groups.items()},
         "sha256": {split: _sha256_names(names) for split, names in result.items()},
         "historical_train_samples_moved_to_test_for_group_closure": len(moved_to_test),
-        "historical_train_groups_moved_to_test": len(
-            {classify(task, name)[0] for name in moved_to_test}
-        ),
+        "historical_train_groups_moved_to_test": len(moved_test_groups),
+        "historical_train_group_ids_moved_to_test": moved_test_groups,
         "strata": stratum_summary,
     }
     return result, metadata
