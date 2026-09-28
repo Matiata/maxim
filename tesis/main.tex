@@ -140,51 +140,39 @@ perjudicar tareas posteriores de visión por computadora, como la detección, la
 segmentación o el reconocimiento de objetos.
 
 La restauración de imágenes estudia cómo recuperar una imagen limpia a partir
-de una observación degradada. En términos generales, puede interpretarse como
-un problema inverso: se observa el resultado de un proceso de formación y
-degradación, y se intenta estimar la escena que lo originó. El problema es
-difícil porque diferentes imágenes limpias pueden dar lugar a observaciones
-similares y porque, en aplicaciones reales, el tipo y la intensidad de la
-degradación no siempre son conocidos. Por esta razón, una reconstrucción
-adecuada requiere aprovechar tanto la información local ---bordes, texturas y
-detalles finos--- como el contexto global de la imagen.
+de una observación degradada. El problema es difícil porque diferentes imágenes
+limpias pueden dar lugar a degradaciones similares y porque, en aplicaciones reales,
+el tipo y la intensidad de la degradación no siempre son conocidos. Por esta razón,
+una reconstrucción adecuada requiere aprovechar tanto la información local: bordes, texturas y
+detalles finos, así como el contexto global de la imagen.
 
 Durante los últimos años, los métodos basados en aprendizaje profundo han
 reemplazado gran parte de los procedimientos diseñados de manera específica
 para cada degradación. A partir de pares de imágenes degradadas y sus
 correspondientes referencias, una red neuronal puede aprender una transformación
-de restauración sin que sea necesario definir explícitamente todas las etapas
-del proceso inverso. Sin embargo, es habitual entrenar un modelo distinto para
+de restauración, sin embargo, es habitual entrenar un modelo distinto para
 cada tarea. Esta estrategia permite una alta especialización, pero obliga a
-mantener y ejecutar varios modelos cuando un sistema debe responder ante
-degradaciones heterogéneas.
+mantener y ejecutar varios modelos cuando un sistema debe responder correctamente
+ante degradaciones variadas.
 
 Una alternativa consiste en entrenar un único modelo para varias tareas de
 restauración. Este enfoque reduce la duplicación de parámetros y permite
 compartir representaciones entre problemas relacionados. Al mismo tiempo,
 introduce una dificultad: eliminar ruido, compensar desenfoque, remover lluvia,
 reducir neblina y realzar una imagen oscura requieren transformaciones
-diferentes y, en algunos casos, parcialmente contrapuestas. Un único camino de
+diferentes y, en algunos casos, parcialmente opuestas. Un único camino de
 cómputo debe aprender entonces una solución suficientemente general para todas
 ellas. Si la capacidad compartida no puede adaptarse al tipo de degradación
 presente en cada entrada, el aprendizaje conjunto puede producir interferencia
 entre tareas y limitar la calidad de la reconstrucción.
 
-En este trabajo se toma como arquitectura de base a MAXIM
-(\textit{Multi-Axis MLP for Image Processing}), una red propuesta para tareas de
-procesamiento y restauración de imágenes \citep{tu2022maxim}. MAXIM combina una
-estructura jerárquica de tipo codificador--decodificador con bloques capaces de
-modelar interacciones locales y globales. Su diseño permite integrar información
-de distintas escalas y conservar detalles espaciales mediante conexiones entre
-las etapas de codificación y decodificación. Estas propiedades la convierten en
-una base apropiada para estudiar restauración multi-tarea: el modelo dispone de
-un extractor común de características, pero su formulación estándar mantiene el
-mismo flujo de procesamiento para todas las entradas.
+En este trabajo se adopta MAXIM (\textit{Multi-Axis MLP for Image Processing}) como 
+arquitectura base para la restauración de imágenes \citep{tu2022maxim}. Su diseño sigue una estructura codificador/decodificador tipo U-Net, con conexiones \textit{skip} que combinan características de bajo y alto nivel y contribuyen a preservar la información espacial. A diferencia de las arquitecturas puramente convolucionales, MAXIM incorpora bloques \textit{Multi-Axis Gated MLP}, que capturan interacciones locales  y globales. Esta combinación permite integrar información en distintas escalas y capturar tanto detalles finos como patrones globales. Sin embargo, en su formulación estándar, todas las imágenes atraviesan el mismo flujo de procesamiento, independientemente del tipo de degradación presente, lo que motiva estudiar mecanismos de especialización para un escenario de restauración multi-tarea.
 
 La hipótesis que motiva esta tesis es que dicho flujo compartido puede
 complementarse con el paradigma \textit{Mixture of Experts} (MoE). En una mezcla
 de expertos, varios módulos con capacidad de especialización colaboran bajo el
-control de un ruteador, que asigna a cada experto una relevancia dependiente de
+control de un ruteador, que asigna a cada experto un peso en base a 
 la entrada \citep{jacobs1991adaptive,shazeer2017outrageously}. En lugar de exigir
 que todos los parámetros resuelvan de la misma forma cualquier degradación, el
 modelo puede compartir una parte sustancial del procesamiento y reservar otra
@@ -195,6 +183,23 @@ deben intervenir y con qué peso en la reconstrucción.
 La combinación de MAXIM y MoE plantea un compromiso entre generalización,
 especialización y costo computacional. Replicar una red completa por cada tarea
 produciría especialistas independientes, pero eliminaría gran parte del
+beneficio de un modelo unificado. En el extremo opuesto, reemplazar por completo
+la salida de MAXIM con expertos inicializados de manera similar puede dificultar
+la diferenciación entre ellos y perder una referencia común de reconstrucción.
+La arquitectura estudiada en este trabajo conserva, por lo tanto, una cabeza
+compartida equivalente a la salida original de MAXIM y utiliza los expertos para
+modelar correcciones residuales condicionadas por la entrada. Si estas
+correcciones son nulas, el modelo recupera exactamente el camino compartido de
+la arquitectura base.
+
+La ubicación de los expertos, su capacidad, la señal utilizada por el ruteador
+y la forma de entrenar la mezcla continúan siendo decisiones centrales. En
+particular, el ruteador puede activar todos los expertos o seleccionar solamente
+un subconjunto mediante un esquema \textit{top-k}. También es necesario
+preservar los mecanismos de supervisión profunda y multi-escala de MAXIM. En la
+implementación considerada, las salidas auxiliares permanecen conectadas a sus
+pérdidas originales y la mezcla de expertos modifica únicamente la predicción
+final a resolución completa.
 beneficio de un modelo unificado. En el extremo opuesto, reemplazar por completo
 la salida de MAXIM con expertos inicializados de manera similar puede dificultar
 la diferenciación entre ellos y perder una referencia común de reconstrucción.
@@ -224,9 +229,22 @@ expresa conceptualmente como
   \widehat{y} = x {}+ H_{\mathrm{comp}}\!\left(f_{\theta}(x)\right)
   {}+ \sum_{k=1}^{K} p_k\!\left(f_{\theta}(x)\right)
       \,\Delta E_k\!\left(f_{\theta}(x)\right),
+  \widehat{y} = x {}+ H_{\mathrm{comp}}\!\left(f_{\theta}(x)\right)
+  {}+ \sum_{k=1}^{K} p_k\!\left(f_{\theta}(x)\right)
+      \,\Delta E_k\!\left(f_{\theta}(x)\right),
   \label{eq:intro-moe}
 \end{equation}
 
+donde $f_{\theta}$ representa las características compartidas producidas por
+MAXIM, $H_{\mathrm{comp}}$ es la cabeza de reconstrucción compartida y
+$\Delta E_k$ es la corrección propuesta por el $k$-ésimo experto. El término
+$x$ conserva la conexión residual entre la imagen degradada y la predicción
+final. Los pesos $p_k$ representan las asignaciones finales del ruteador,
+calculadas a partir de las características de la entrada, y satisfacen
+$p_k\geq 0$ y $\sum_{k=1}^{K}p_k=1$. En un ruteo \textit{top-k}, como máximo
+$k$ de estos pesos son distintos de cero. La Ecuación~\ref{eq:intro-moe}
+describe la idea general; la
+capacidad de las cabezas, la forma concreta del ruteador y las pérdidas
 donde $f_{\theta}$ representa las características compartidas producidas por
 MAXIM, $H_{\mathrm{comp}}$ es la cabeza de reconstrucción compartida y
 $\Delta E_k$ es la corrección propuesta por el $k$-ésimo experto. El término
@@ -242,18 +260,20 @@ empleadas se presentan en los capítulos metodológicos.
 El objetivo general de esta tesis es diseñar y evaluar una extensión de MAXIM
 basada en mezcla de expertos para restaurar imágenes afectadas por distintos
 tipos de degradación dentro de un único modelo. La evaluación busca determinar
-si la especialización condicionada por la entrada aporta ventajas frente a una
-línea base MAXIM multi-tarea entrenada en condiciones equivalentes.
+si la especialización aporta ventajas frente a una versión base MAXIM multi-tarea entrenada en condiciones equivalentes.
 
 Para alcanzar este objetivo general se plantean los siguientes objetivos
 específicos:
 
 \begin{itemize}
-  \item implementar y entrenar una línea base de MAXIM que sirva como referencia
+  \item implementar y entrenar una versión base de MAXIM que sirva como referencia
         reproducible para las comparaciones;
   \item construir un conjunto de entrenamiento multi-tarea con ejemplos de
         eliminación de desenfoque, neblina, ruido y lluvia, además de realce de
         imágenes con baja iluminación;
+  \item incorporar una cabeza compartida y expertos residuales a la arquitectura,
+        conservando la supervisión profunda y el procesamiento en múltiples
+        escalas;
   \item incorporar una cabeza compartida y expertos residuales a la arquitectura,
         conservando la supervisión profunda y el procesamiento en múltiples
         escalas;
@@ -268,7 +288,7 @@ La comparación experimental se diseña para aislar, en la medida de lo posible,
 el efecto de la mezcla de expertos. Esto exige utilizar los mismos datos, el
 mismo presupuesto de entrenamiento y configuraciones de capacidad comparables
 entre el modelo propuesto y la línea base. Además de medir la calidad final de
-las imágenes, resulta necesario observar si los expertos desarrollan funciones
+las imágenes, es necesario observar si los expertos desarrollan funciones
 diferenciadas y si las decisiones del ruteador guardan relación con las
 degradaciones presentes. De este modo, el análisis no queda limitado a una
 única métrica agregada, sino que considera también el mecanismo que se pretende
