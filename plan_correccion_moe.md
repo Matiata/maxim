@@ -27,7 +27,7 @@ Las siguientes iteraciones se harán en tres bloques, en este orden:
 | MoE latente K=8 top-2 | Completado | 27,060 dB ponderado y 30,800 dB macro; cuatro de ocho expertos quedaron inactivos |
 | Corrección del protocolo de métricas | Siguiente | Separar ponderado/macro, criterio de checkpoint y funciones de validación/test |
 | MoE token-choice K=8 sobre features | Pendiente | Enrutar cada token del feature map por separado; sin pooling global ni gate único por imagen |
-| Cabeza compartida inicializada desde baseline | Pendiente | Cargar parámetros baseline, inicializar residuales en cero y entrenar con control baseline de igual presupuesto adicional |
+| Cabeza compartida inicializada desde baseline | Implementada; preflight pendiente | Carga exacta del baseline, residuales en cero, equivalencia `<1e-6`, optimizador nuevo y presupuesto adicional de 10 épocas |
 
 ## Datasets finales
 
@@ -269,8 +269,8 @@ Guardar en ambos:
 3. Implementar soporte `val/test` sin generar un split silenciosamente.
 4. En `exp/latent-experts-k8`, implementar token-choice `[B,N,K]` sobre features, expertos `C→C`, balance denso y top-2 por token.
 5. Ejecutar tests unitarios y un smoke test corto del K=8; no lanzar todavía una corrida completa si aparecen expertos muertos.
-6. En la branch de cabeza compartida, implementar warm start exacto desde baseline.
-7. Preparar los dos notebooks de continuación con `EXTRA_EPOCHS=10`: baseline control y MoE compartido.
+6. En la branch de cabeza compartida, implementar warm start exacto desde baseline. **Implementado en `main`; falta ejecutar el preflight con el checkpoint de Drive.**
+7. Preparar los dos notebooks de continuación con `EXTRA_EPOCHS=10`: baseline control y MoE compartido. **MoE compartido preparado; control baseline pendiente.**
 8. Verificar equivalencia inicial, presupuesto y directorios de salida.
 9. Sólo después de esos chequeos, lanzar las corridas completas.
 
