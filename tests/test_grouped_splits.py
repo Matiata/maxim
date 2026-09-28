@@ -36,6 +36,10 @@ class GroupedSplitTest(unittest.TestCase):
             ["SOTS_indoor_1400_3.png", "SOTS_indoor_1400_1.png", "SOTS_indoor_1400_2.png"],
         )
         self.assertEqual(metadata["historical_train_groups_moved_to_test"], 1)
+        self.assertEqual(
+            metadata["historical_train_group_ids_moved_to_test"],
+            ["sots_indoor_1400"],
+        )
         groups = {
             split: {classify("dehaze", name)[0] for name in names}
             for split, names in splits.items()
