@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 from PIL import Image
@@ -95,19 +96,33 @@ def validate_task(
 
 
 def main() -> None:
+    default_dataset_root = Path("/content/gdrive/MyDrive/Facultad/tesis/Datasets/Classifier")
+    if not default_dataset_root.exists():
+        default_dataset_root = Path("/content/drive/MyDrive/Facultad/tesis/Datasets/Classifier")
+    default_manifest = Path("/content/maxim/datasets/splits_v2/split_manifest.json")
+    if Path("/content/split_manifest.json").is_file():
+        default_manifest = Path("/content/split_manifest.json")
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--dataset-root",
         type=Path,
-        default=Path("/content/gdrive/MyDrive/Facultad/tesis/Datasets/Classifier"),
+        default=default_dataset_root,
     )
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=Path("/content/maxim/datasets/splits_v2/split_manifest.json"),
+        default=default_manifest,
     )
     parser.add_argument("--decode-per-split", type=int, default=2)
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    # IPython kernels inject ``-f <connection-file>`` into sys.argv. Accept
+    # only that known pair so genuine CLI typos still fail loudly.
+    if unknown:
+        expected_kernel_args = len(unknown) == 2 and unknown[0] == "-f"
+        expected_kernel_args &= unknown[1].endswith(".json")
+        if not expected_kernel_args or "ipykernel" not in sys.modules:
+            parser.error(f"unrecognized arguments: {' '.join(unknown)}")
     if args.decode_per_split < 1:
         raise ValueError("decode-per-split must be positive")
 
