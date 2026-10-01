@@ -26,8 +26,8 @@ Las siguientes iteraciones se harán en tres bloques, en este orden:
 | MoE K=5 con cabeza compartida | Completado | 27,350 dB ponderado y 30,720 dB macro |
 | MoE latente K=8 top-2 | Completado | 27,060 dB ponderado y 30,800 dB macro; cuatro de ocho expertos quedaron inactivos |
 | Corrección del protocolo de métricas | Completado | Ponderado/macro explícitos, selección por validación, test final separado y splits agrupados verificados en Drive |
-| MoE token-choice K=8 sobre features | Implementado; smoke funcional aprobado | Router y gates `[B,N,K]`, expertos `C→C`, top-2 por token, balance denso, exploración y warm-up denso; falta smoke training con MAXIM real |
-| Cabeza compartida inicializada desde baseline | Pendiente | Cargar parámetros baseline, inicializar residuales en cero y entrenar con control baseline de igual presupuesto adicional |
+| MoE token-choice K=8 sobre features | Corrida completa en curso | Router y gates `[B,N,K]`, expertos `C→C`, top-2 por token, balance denso, exploración y warm-up denso; smoke training completo aprobado el 28/09/2026 |
+| Cabeza compartida inicializada desde baseline | Corrida MoE en curso | Warm start exacto y residuales en cero implementados; queda preparar/ejecutar la continuación baseline con igual presupuesto adicional |
 
 ## Datasets finales
 
@@ -203,9 +203,15 @@ La implementación semántica mínima puede evaluar los ocho expertos sobre todo
 - La salida reconstruida debe conservar la resolución y el contrato RGB de MAXIM.
 - Reiniciar desde cero en un `OUTPUT_DIR` nuevo; no restaurar el checkpoint K=8 colapsado.
 
+### Estado de ejecución
+
+El smoke training real de tres épocas y 20 pasos por época finalizó correctamente. Las dos primeras épocas usaron mezcla densa y la tercera cambió a top-2 por token. No hubo errores ni valores no finitos; el router y los ocho expertos recibieron gradientes. En la época top-2, la inclusión por experto permaneció por encima del umbral de experto muerto y el PSNR macro de validación mejoró en las tres épocas (`-22,05 → -14,48 → -10,77 dB`). Los valores absolutos bajos son esperables tras sólo 60 actualizaciones desde cero.
+
+La corrida completa `moe_token_choice_k8_top2_S-2_scratch` fue iniciada el 28/09/2026 con 30 épocas, 2.000 pasos por época, batch 2, dos épocas de routing denso y top-2 desde la tercera. Se debe monitorear especialmente que ningún experto quede por debajo de 1 % de inclusión top-2 durante tres épocas consecutivas.
+
 ## Bloque 3 — Cabeza compartida inicializada desde baseline
 
-Este bloque se implementará en el notebook de cabeza compartida sobre `main` o una branch nueva derivada de `main`, sin mezclar todavía los cambios experimentales del router K=8.
+Este bloque se implementó en el notebook de cabeza compartida sobre `main`, separado de los cambios experimentales del router K=8. La corrida MoE inicializada desde el baseline está en curso; el control baseline continuado sigue pendiente.
 
 ### Inicialización
 
@@ -268,11 +274,11 @@ Guardar en ambos:
 2. Aplicar esas métricas al baseline, K=5, K=8 y cabeza compartida. **Completado.**
 3. Implementar soporte `val/test` sin generar un split silenciosamente. **Completado y verificado en Drive.**
 4. En `exp/latent-experts-k8`, implementar token-choice `[B,N,K]` sobre features, expertos `C→C`, balance denso y top-2 por token. **Implementado.**
-5. Ejecutar tests unitarios y un smoke test corto del K=8; no lanzar todavía una corrida completa si aparecen expertos muertos. **Tests locales y smoke funcional JAX/Colab aprobados; falta el smoke training con MAXIM real.**
-6. En la branch de cabeza compartida, implementar warm start exacto desde baseline.
-7. Preparar los dos notebooks de continuación con `EXTRA_EPOCHS=10`: baseline control y MoE compartido.
-8. Verificar equivalencia inicial, presupuesto y directorios de salida.
-9. Sólo después de esos chequeos, lanzar las corridas completas.
+5. Ejecutar tests unitarios y un smoke test corto del K=8; no lanzar todavía una corrida completa si aparecen expertos muertos. **Completado: tests locales, smoke funcional JAX/Colab y smoke training con MAXIM real aprobados.**
+6. En la branch de cabeza compartida, implementar warm start exacto desde baseline. **Completado.**
+7. Preparar los dos notebooks de continuación con `EXTRA_EPOCHS=10`: baseline control y MoE compartido. **MoE compartido preparado e iniciado; control baseline pendiente.**
+8. Verificar equivalencia inicial, presupuesto y directorios de salida. **Verificado para el MoE compartido; pendiente para el control baseline.**
+9. Sólo después de esos chequeos, lanzar las corridas completas. **Corrida completa K=8 token-choice iniciada; las comparaciones de cabeza compartida/control baseline continúan como bloque separado.**
 
 ## Criterios para corridas comparables
 
