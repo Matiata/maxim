@@ -9,6 +9,48 @@ import numpy as np
 
 SELECTION_METRIC = "psnr_macro"
 SUPPORTED_SELECTION_METRICS = ("psnr_macro", "psnr_weighted")
+def _aggregate_task_mean(
+    task_sum: Sequence[float],
+    task_count: Sequence[int],
+    *,
+    metric_name: str,
+) -> dict[str, object]:
+    """Aggregate per-image metric sums by task, weighted mean and macro mean."""
+    values_sum = np.asarray(task_sum, dtype=np.float64)
+    counts = np.asarray(task_count, dtype=np.int64)
+    if values_sum.ndim != 1 or counts.ndim != 1 or values_sum.shape != counts.shape:
+        raise ValueError(
+            f"task_{metric_name}_sum and task_count must be one-dimensional "
+            "arrays with the same shape."
+        )
+    if np.any(counts < 0):
+        raise ValueError("task_count cannot contain negative values.")
+    present = counts > 0
+    if not np.any(present):
+        raise ValueError("At least one task must contain evaluation samples.")
+    if not np.all(np.isfinite(values_sum[present])):
+        raise ValueError(
+            f"{metric_name.upper()} sums for present tasks must be finite."
+        )
+
+    task_metric = np.divide(
+        values_sum,
+        counts,
+        out=np.full(values_sum.shape, np.nan, dtype=np.float64),
+        where=present,
+    )
+    total_count = int(np.sum(counts))
+    weighted = float(
+        np.sum(task_metric[present] * counts[present]) / total_count
+    )
+    macro = float(np.mean(task_metric[present]))
+    return {
+        f"{metric_name}_weighted": weighted,
+        f"{metric_name}_macro": macro,
+        f"task_{metric_name}": task_metric,
+        "task_count": counts,
+        "sample_count": total_count,
+    }
 
 
 def aggregate_task_psnr(
@@ -19,37 +61,18 @@ def aggregate_task_psnr(
     Tasks with no samples are represented by ``NaN`` and excluded from the macro
     mean. The weighted value is the per-image mean over every present task.
     """
-    psnr_sum = np.asarray(task_psnr_sum, dtype=np.float64)
-    counts = np.asarray(task_count, dtype=np.int64)
-    if psnr_sum.ndim != 1 or counts.ndim != 1 or psnr_sum.shape != counts.shape:
-        raise ValueError(
-            "task_psnr_sum and task_count must be one-dimensional arrays "
-            "with the same shape."
-        )
-    if np.any(counts < 0):
-        raise ValueError("task_count cannot contain negative values.")
-    present = counts > 0
-    if not np.any(present):
-        raise ValueError("At least one task must contain evaluation samples.")
-    if not np.all(np.isfinite(psnr_sum[present])):
-        raise ValueError("PSNR sums for present tasks must be finite.")
-
-    task_psnr = np.divide(
-        psnr_sum,
-        counts,
-        out=np.full(psnr_sum.shape, np.nan, dtype=np.float64),
-        where=present,
+    return _aggregate_task_mean(
+        task_psnr_sum, task_count, metric_name="psnr"
     )
-    total_count = int(np.sum(counts))
-    psnr_weighted = float(np.sum(task_psnr[present] * counts[present]) / total_count)
-    psnr_macro = float(np.mean(task_psnr[present]))
-    return {
-        "psnr_weighted": psnr_weighted,
-        "psnr_macro": psnr_macro,
-        "task_psnr": task_psnr,
-        "task_count": counts,
-        "sample_count": total_count,
-    }
+
+
+def aggregate_task_ssim(
+    task_ssim_sum: Sequence[float], task_count: Sequence[int]
+) -> dict[str, object]:
+    """Aggregate per-image SSIM sums using the same task counts as PSNR."""
+    return _aggregate_task_mean(
+        task_ssim_sum, task_count, metric_name="ssim"
+    )
 
 
 def build_best_metric_payload(
@@ -71,7 +94,7 @@ def build_best_metric_payload(
     if len(task_names) != len(task_psnr) or task_psnr.shape != task_count.shape:
         raise ValueError("task_names, task_psnr and task_count must have equal lengths.")
 
-    return {
+    payload = {
         "epoch": int(epoch),
         "selection_metric": selection_metric,
         "selection_value": float(metrics[selection_metric]),
@@ -81,6 +104,36 @@ def build_best_metric_payload(
         "task_psnr": task_psnr.tolist(),
         "task_count": task_count.tolist(),
     }
+    ssim_keys = ("ssim_macro", "ssim_weighted", "task_ssim")
+    available_ssim_keys = [key for key in ssim_keys if key in metrics]
+    if available_ssim_keys and len(available_ssim_keys) != len(ssim_keys):
+        missing_ssim = [key for key in ssim_keys if key not in metrics]
+        raise KeyError(f"Incomplete SSIM checkpoint metrics: {missing_ssim}")
+    if available_ssim_keys:
+        task_ssim = np.asarray(metrics["task_ssim"], dtype=np.float64)
+        if task_ssim.shape != task_count.shape:
+            raise ValueError("task_ssim and task_count must have equal lengths.")
+        if not np.all(np.isfinite(task_ssim[task_count > 0])):
+            raise ValueError("SSIM values for present tasks must be finite.")
+        payload.update(
+            {
+                "ssim_macro": float(metrics["ssim_macro"]),
+                "ssim_weighted": float(metrics["ssim_weighted"]),
+                "task_ssim": task_ssim.tolist(),
+                "ssim_config": {
+                    "data_range": 1.0,
+                    "filter_size": 11,
+                    "filter_sigma": 1.5,
+                    "k1": 0.01,
+                    "k2": 0.03,
+                    "color_space": "RGB",
+                    "channel_reduction": "mean",
+                    "padding": "VALID",
+                    "clipping": "none",
+                },
+            }
+        )
+    return payload
 
 
 def read_selection_value(
