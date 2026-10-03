@@ -149,6 +149,8 @@ def read_selection_value(
         raise KeyError(f"Missing {selection_metric!r} in best checkpoint metadata.")
     value = float(payload[selection_metric])
     epoch = int(payload.get("epoch", -1))
-    if not np.isfinite(value) or epoch < 1:
+    # Epoch 0 is valid for continuation experiments: it represents the
+    # unchanged source checkpoint evaluated before any additional update.
+    if not np.isfinite(value) or epoch < 0:
         raise ValueError(f"Invalid best checkpoint metadata: {payload}")
     return value, epoch
