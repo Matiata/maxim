@@ -112,19 +112,43 @@ class CALayer(nn.Module):
 
 
 class RCAB(nn.Module):
-  """Residual channel attention block. Contains LN,Conv,lRelu,Conv,SELayer."""
+  """Residual channel attention block. Contains LN,Conv,lRelu,Conv,SELayer.
+
+  ``local_mixer`` selects what replaces the conv1/lrelu/conv2 pair:
+  ``"dense"`` (original MAXIM, default), ``"bottleneck"`` (a
+  ``TaskBottleneckBank`` with ``mixer_num_experts`` task experts) or
+  ``"none"`` (pair removed; only used as a cost ceiling). LayerNorm, channel
+  attention and the residual connection are kept in every mode.
+  """
   features: int
   reduction: int = 4
   lrelu_slope: float = 0.2
   use_bias: bool = True
+  local_mixer: str = "dense"
+  mixer_width: int = 32
+  mixer_num_experts: int = 1
+  mixer_selection: str = "gather"
 
   @nn.compact
-  def __call__(self, x):
+  def __call__(self, x, task_id=None):
     shortcut = x
     x = nn.LayerNorm(name="LayerNorm")(x)
-    x = Conv3x3(features=self.features, use_bias=self.use_bias, name="conv1")(x)
-    x = nn.leaky_relu(x, negative_slope=self.lrelu_slope)
-    x = Conv3x3(features=self.features, use_bias=self.use_bias, name="conv2")(x)
+    if self.local_mixer == "dense":
+      x = Conv3x3(features=self.features, use_bias=self.use_bias, name="conv1")(x)
+      x = nn.leaky_relu(x, negative_slope=self.lrelu_slope)
+      x = Conv3x3(features=self.features, use_bias=self.use_bias, name="conv2")(x)
+    elif self.local_mixer == "bottleneck":
+      # Imported lazily: compression.py does not depend on this module.
+      from maxim.models.compression import TaskBottleneckBank
+      x = TaskBottleneckBank(
+          features=self.features,
+          width=self.mixer_width,
+          num_experts=self.mixer_num_experts,
+          use_bias=self.use_bias,
+          selection=self.mixer_selection,
+          name="local_mixer")(x, task_id)
+    elif self.local_mixer != "none":
+      raise ValueError(f"Unknown local_mixer={self.local_mixer!r}")
     x = CALayer(features=self.features, reduction=self.reduction,
                 use_bias=self.use_bias, name="channel_attention")(x)
     return x + shortcut
@@ -355,11 +379,18 @@ class UNetEncoderBlock(nn.Module):
   use_global_mlp: bool = True
   use_bias: bool = True
   use_cross_gating: bool = False
+  rcab_mixer: str = "dense"
+  rcab_mixer_width: int = 32
+  rcab_mixer_num_experts: int = 1
+  rcab_mixer_selection: str = "gather"
 
+  # ``deterministic`` may be passed positionally so that MAXIM can wrap this
+  # block with ``nn.remat(..., static_argnums=(5,))``.
   @nn.compact
   def __call__(self, x: jnp.ndarray, skip: jnp.ndarray = None,
-               enc: jnp.ndarray = None, dec: jnp.ndarray = None, *,
-               deterministic: bool = True) -> jnp.ndarray:
+               enc: jnp.ndarray = None, dec: jnp.ndarray = None,
+               deterministic: bool = True,
+               task_id: jnp.ndarray = None) -> jnp.ndarray:
     if skip is not None:
       x = jnp.concatenate([x, skip], axis=-1)
 
@@ -382,7 +413,11 @@ class UNetEncoderBlock(nn.Module):
           features=self.features,
           reduction=self.channels_reduction,
           use_bias=self.use_bias,
-          name=f"channel_attention_block_1{i}")(x)
+          local_mixer=self.rcab_mixer,
+          mixer_width=self.rcab_mixer_width,
+          mixer_num_experts=self.rcab_mixer_num_experts,
+          mixer_selection=self.rcab_mixer_selection,
+          name=f"channel_attention_block_1{i}")(x, task_id)
 
     x = x + shortcut_long
 
@@ -421,10 +456,15 @@ class UNetDecoderBlock(nn.Module):
   downsample: bool = True
   use_global_mlp: bool = True
   use_bias: bool = True
+  rcab_mixer: str = "dense"
+  rcab_mixer_width: int = 32
+  rcab_mixer_num_experts: int = 1
+  rcab_mixer_selection: str = "gather"
 
   @nn.compact
   def __call__(self, x: jnp.ndarray, bridge: jnp.ndarray = None,
-               deterministic: bool = True) -> jnp.ndarray:
+               deterministic: bool = True,
+               task_id: jnp.ndarray = None) -> jnp.ndarray:
     x = ConvT_up(self.features, use_bias=self.use_bias)(x)
 
     x = UNetEncoderBlock(
@@ -439,7 +479,12 @@ class UNetDecoderBlock(nn.Module):
         use_global_mlp=self.use_global_mlp,
         dropout_rate=self.dropout_rate,
         downsample=False,
-        use_bias=self.use_bias)(x, skip=bridge, deterministic=deterministic)
+        use_bias=self.use_bias,
+        rcab_mixer=self.rcab_mixer,
+        rcab_mixer_width=self.rcab_mixer_width,
+        rcab_mixer_num_experts=self.rcab_mixer_num_experts,
+        rcab_mixer_selection=self.rcab_mixer_selection)(
+            x, skip=bridge, deterministic=deterministic, task_id=task_id)
     return x
 
 
@@ -667,10 +712,55 @@ class MAXIM(nn.Module):
   channels_reduction: int = 4
   num_outputs: int = 3
   dropout_rate: float = 0.0
+  # Compression options. Defaults reproduce the original MAXIM exactly, with
+  # the same parameter tree. ``rcab_mixer`` replaces the conv1/conv2 pair of
+  # the RCABs inside encoder/decoder blocks at the U-Net levels listed in
+  # ``rcab_mixer_levels`` (0 = full resolution). See RCAB.
+  rcab_mixer: str = "dense"
+  rcab_mixer_levels: Sequence[int] = ()
+  rcab_mixer_width: int = 32
+  rcab_mixer_num_experts: int = 1
+  # "gather" executes only the selected expert; "all_experts_reference"
+  # computes every expert and masks them (verification/cost reference only).
+  rcab_mixer_selection: str = "gather"
+  # Per-block rematerialization of encoder, bottleneck, cross-gating and
+  # decoder blocks. Only changes memory/time of training, not the function.
+  remat_blocks: bool = False
+
+  def _rcab_kwargs(self, level):
+    mixer = self.rcab_mixer if level in tuple(self.rcab_mixer_levels) else "dense"
+    return {
+        "rcab_mixer": mixer,
+        "rcab_mixer_width": self.rcab_mixer_width,
+        "rcab_mixer_num_experts": self.rcab_mixer_num_experts,
+        "rcab_mixer_selection": self.rcab_mixer_selection,
+    }
 
   @nn.compact
   def __call__(self, x: jnp.ndarray, *, train: bool = False,
-               return_features: bool = False) -> Any:
+               return_features: bool = False, task_id=None) -> Any:
+
+    needs_task = (self.rcab_mixer == "bottleneck"
+                  and self.rcab_mixer_num_experts > 1
+                  and len(tuple(self.rcab_mixer_levels)) > 0)
+    if needs_task and task_id is None:
+      raise ValueError("task_id is required by the task-expert RCAB mixer.")
+    if task_id is not None:
+      task_id = jnp.asarray(task_id, dtype=jnp.int32).reshape(-1)
+
+    if self.remat_blocks:
+      from maxim.models.compat import install_flax_remat_compat
+      install_flax_remat_compat()
+      # static_argnums count ``self`` as 0 and mark ``deterministic``.
+      EncoderBlock = nn.remat(UNetEncoderBlock, static_argnums=(5,))
+      DecoderBlock = nn.remat(UNetDecoderBlock, static_argnums=(3,))
+      Bottleneck = nn.remat(BottleneckBlock, static_argnums=(2,))
+      CrossGating = nn.remat(CrossGatingBlock, static_argnums=(3,))
+    else:
+      EncoderBlock = UNetEncoderBlock
+      DecoderBlock = UNetDecoderBlock
+      Bottleneck = BottleneckBlock
+      CrossGating = CrossGatingBlock
 
     n, h, w, c = x.shape  # input image shape
     shortcuts = []
@@ -702,7 +792,7 @@ class MAXIM(nn.Module):
           if self.use_cross_gating:
             block_size = self.block_size_hr if i < self.high_res_stages else self.block_size_lr
             grid_size = self.grid_size_hr if i < self.high_res_stages else self.block_size_lr
-            x_scale, _ = CrossGatingBlock(
+            x_scale, _ = CrossGating(
                 features=(2**i) * self.features,
                 block_size=block_size,
                 grid_size=grid_size,
@@ -711,7 +801,7 @@ class MAXIM(nn.Module):
                 upsample_y=False,
                 use_bias=self.use_bias,
                 name=f"stage_{idx_stage}_input_fuse_sam_{i}")(
-                    x_scale, sam_features.pop(), deterministic=not train)
+                    x_scale, sam_features.pop(), not train)
           else:
             x_scale = Conv1x1(
                 (2**i) * self.features,
@@ -739,7 +829,7 @@ class MAXIM(nn.Module):
         enc_prev = encs_prev.pop() if idx_stage > 0 else None
         dec_prev = decs_prev.pop() if idx_stage > 0 else None
 
-        x, bridge = UNetEncoderBlock(
+        x, bridge = EncoderBlock(
             features=(2**i) * self.features,
             num_groups=self.num_groups,
             downsample=True,
@@ -754,19 +844,16 @@ class MAXIM(nn.Module):
             dropout_rate=self.dropout_rate,
             use_bias=self.use_bias,
             use_cross_gating=use_cross_gating_layer,
+            **self._rcab_kwargs(i),
             name=f"stage_{idx_stage}_encoder_block_{i}")(
-                x,
-                skip=x_scale,
-                enc=enc_prev,
-                dec=dec_prev,
-                deterministic=not train)
+                x, x_scale, enc_prev, dec_prev, not train, task_id)
 
         # Cache skip signals
         encs.append(bridge)
 
       # Global MLP bottleneck blocks
       for i in range(self.num_bottleneck_blocks):
-        x = BottleneckBlock(
+        x = Bottleneck(
             block_size=self.block_size_lr,
             grid_size=self.block_size_lr,
             features=(2**(self.depth - 1)) * self.features,
@@ -777,8 +864,7 @@ class MAXIM(nn.Module):
             dropout_rate=self.dropout_rate,
             use_bias=self.use_bias,
             channels_reduction=self.channels_reduction,
-            name=f"stage_{idx_stage}_global_block_{i}")(
-                x, deterministic=not train)
+            name=f"stage_{idx_stage}_global_block_{i}")(x, not train)
       # cache global feature for cross-gating
       global_feature = x
 
@@ -800,7 +886,7 @@ class MAXIM(nn.Module):
 
         # Use cross-gating to cross modulate features
         if self.use_cross_gating:
-          skips, global_feature = CrossGatingBlock(
+          skips, global_feature = CrossGating(
               features=(2**i) * self.features,
               block_size=block_size,
               grid_size=grid_size,
@@ -809,7 +895,7 @@ class MAXIM(nn.Module):
               upsample_y=True,
               use_bias=self.use_bias,
               name=f"stage_{idx_stage}_cross_gating_block_{i}")(
-                  signal, global_feature, deterministic=not train)
+                  signal, global_feature, not train)
         else:
           skips = Conv1x1(
               (2**i) * self.features, use_bias=self.use_bias)(
@@ -837,7 +923,7 @@ class MAXIM(nn.Module):
                                  axis=-1)
 
         # Decoder block
-        x = UNetDecoderBlock(
+        x = DecoderBlock(
             features=(2**i) * self.features,
             num_groups=self.num_groups,
             lrelu_slope=self.lrelu_slope,
@@ -850,8 +936,9 @@ class MAXIM(nn.Module):
             use_global_mlp=self.use_global_mlp,
             dropout_rate=self.dropout_rate,
             use_bias=self.use_bias,
+            **self._rcab_kwargs(i),
             name=f"stage_{idx_stage}_decoder_block_{i}")(
-                x, bridge=signal, deterministic=not train)
+                x, signal, not train, task_id)
 
         # Cache decoder features for later-stage's usage
         decs.append(x)
