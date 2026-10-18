@@ -4,6 +4,7 @@ import numpy as np
 
 from maxim.evaluation_metrics import (
     aggregate_task_psnr,
+    aggregate_task_ssim,
     build_best_metric_payload,
     read_selection_value,
 )
@@ -40,6 +41,25 @@ class AggregateTaskPsnrTest(unittest.TestCase):
             aggregate_task_psnr([0.0, 0.0], [0, 0])
 
 
+class AggregateTaskSsimTest(unittest.TestCase):
+    def test_unequal_task_sizes_keep_weighted_and_macro_distinct(self):
+        task_ssim = np.array([0.5, 0.8, 0.95])
+        task_count = np.array([1, 3, 6])
+        result = aggregate_task_ssim(task_ssim * task_count, task_count)
+
+        self.assertAlmostEqual(result["ssim_weighted"], 0.86)
+        self.assertAlmostEqual(result["ssim_macro"], 0.75)
+        np.testing.assert_allclose(result["task_ssim"], task_ssim)
+        np.testing.assert_array_equal(result["task_count"], task_count)
+
+    def test_absent_task_is_nan_and_excluded_from_macro(self):
+        result = aggregate_task_ssim([0.5, 0.0, 1.8], [1, 0, 2])
+
+        self.assertAlmostEqual(result["ssim_weighted"], 2.3 / 3.0)
+        self.assertAlmostEqual(result["ssim_macro"], 0.7)
+        self.assertTrue(np.isnan(result["task_ssim"][1]))
+
+
 class BestMetricPayloadTest(unittest.TestCase):
     def test_payload_records_selection_protocol_and_all_task_data(self):
         metrics = aggregate_task_psnr([10.0, 60.0], [1, 3])
@@ -58,6 +78,24 @@ class BestMetricPayloadTest(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             read_selection_value(payload)
+
+    def test_payload_includes_ssim_when_validation_provides_it(self):
+        metrics = aggregate_task_psnr([10.0, 60.0], [1, 3])
+        metrics.update(aggregate_task_ssim([0.5, 2.7], [1, 3]))
+
+        payload = build_best_metric_payload(7, metrics, ("a", "b"))
+
+        self.assertAlmostEqual(payload["ssim_weighted"], 0.8)
+        self.assertAlmostEqual(payload["ssim_macro"], 0.7)
+        self.assertEqual(payload["task_ssim"], [0.5, 0.9])
+        self.assertEqual(payload["ssim_config"]["filter_size"], 11)
+
+    def test_historical_payload_without_ssim_remains_valid(self):
+        metrics = aggregate_task_psnr([10.0, 60.0], [1, 3])
+        payload = build_best_metric_payload(7, metrics, ("a", "b"))
+
+        self.assertNotIn("ssim_macro", payload)
+        self.assertNotIn("task_ssim", payload)
 
 
 if __name__ == "__main__":

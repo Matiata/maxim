@@ -1,7 +1,19 @@
+# Entornos y artefactos de instalación
 .venv/
 build/
 maxim.egg-info/
+__pycache__/
+.vscode/
+
+# Datos, checkpoints e imágenes locales (viven en Drive)
+/datasets/
 maxim/ckpts/
 maxim/images/
-maxim/__pycache__/
-__pycache__/
+
+# Carpetas de logs antiguas de la raíz (los logs vigentes están en runs_logs/)
+/moe_outputs/
+/no_moe_outputs/
+
+# Descargas de Colab y logs sueltos
+*.zip
+/maxim/*.log

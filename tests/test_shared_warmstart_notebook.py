@@ -4,7 +4,7 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK_PATH = REPO_ROOT / "maxim" / "moeTrainer.ipynb"
+NOTEBOOK_PATH = REPO_ROOT / "notebooks" / "entrenamiento" / "moeTrainer.ipynb"
 
 
 def notebook_source():

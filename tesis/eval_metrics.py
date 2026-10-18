@@ -295,8 +295,9 @@ def _predict(kind, model, state, x_nhwc):
     if kind == "base":
         preds = model.apply(variables, jnp.asarray(x_nhwc), train=False)
         out = preds[-1][-1] if isinstance(preds, list) else preds
-    else:  # moe -> (pred, gates)
-        out, _ = model.apply(variables, jnp.asarray(x_nhwc), train=False)
+    else:  # moe -> (multi-stage/multi-scale predictions, gates)
+        preds, _ = model.apply(variables, jnp.asarray(x_nhwc), train=False)
+        out = preds[-1][-1]
     return np.clip(np.asarray(out), 0.0, 1.0)
 
 

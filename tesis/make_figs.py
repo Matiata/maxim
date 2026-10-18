@@ -1,238 +1,433 @@
 #!/usr/bin/env python3
-"""Parse training logs and generate clean vector figures for the thesis.
+"""Genera curvas de entrenamiento para las corridas actuales de MAXIM+MoE.
 
-Reads the raw training logs in moe_outputs/ and no_moe_outputs/ and produces
-the PDF figures used in the Results section. Re-run with:
+Lee los cuatro archivos training.log de runs_logs y produce una figura PDF por
+métrica:
 
-    /tmp/plotenv/bin/python tesis/make_figs.py
+* fig_loss.pdf: pérdida media de entrenamiento.
+* fig_psnr_macro.pdf: PSNR macro de validación.
+* fig_psnr_weighted.pdf: PSNR ponderado de validación.
 
-Outputs are written to tesis/figs/.
+Las continuaciones baseline +10 y shared residual +10 parten del baseline
+entrenado durante 30 épocas. Por eso sus épocas 1..10 se representan como
+épocas acumuladas 31..40. En las curvas de validación se agrega el punto fuente
+de la época 30 para hacer explícito el warm start. No se agrega ese punto a la
+pérdida de entrenamiento porque no existe una medición de época 0 comparable.
+
+Uso:
+    python tesis/make_figs.py
+    python tesis/make_figs.py --check-only
+    python tesis/make_figs.py --output-dir /ruta/de/salida
 """
 
+from __future__ import annotations
+
+import argparse
+import ast
+import math
 import os
 import re
-import math
-import numpy as np
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Mapping
+
+# Evita warnings y recompilación de fuentes en entornos con HOME de solo lectura.
+os.environ.setdefault(
+    "MPLCONFIGDIR",
+    str(Path(os.environ.get("TMPDIR", "/tmp")) / "maxim-matplotlib-cache"),
+)
+
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(ROOT, "tesis", "figs")
-os.makedirs(OUT, exist_ok=True)
-
-# ---------------------------------------------------------------------------
-# Global style: clean, academic, serif to match the LaTeX body font.
-# ---------------------------------------------------------------------------
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["DejaVu Serif", "Times New Roman", "cmr10"],
-    "mathtext.fontset": "dejavuserif",
-    "font.size": 9,
-    "axes.titlesize": 9,
-    "axes.labelsize": 9,
-    "legend.fontsize": 8,
-    "xtick.labelsize": 8,
-    "ytick.labelsize": 8,
-    "axes.linewidth": 0.7,
-    "lines.linewidth": 1.4,
-    "grid.linewidth": 0.5,
-    "grid.alpha": 0.45,
-    "figure.dpi": 150,
-    "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.02,
-})
-
-# Colour-blind friendly palette (Okabe-Ito subset).
-C_MULTI = "#0072B2"    # blue          -> MAXIM multi-task (S-3, warm start)
-C_MULTI_S = "#CC79A7"  # reddish purple -> MAXIM multi-task (S-2, from scratch; fair)
-C_SINGLE = "#009E73"   # green         -> MAXIM single-task baseline
-C_MOE = "#D55E00"      # orange        -> MAXIM+MoE
-C_AUX = "#5A5A5A"      # grey          -> references / second axis
+import numpy as np
 
 
-# ---------------------------------------------------------------------------
-# Parsing helpers
-# ---------------------------------------------------------------------------
-def parse_moe(path):
-    """MoE epoch summaries: 'Epoch N Training/Validation Metrics: {...}'."""
-    tr, va = {}, {}
-    re_tr = re.compile(r"Epoch (\d+) Training Metrics: \{(.+)\}")
-    re_va = re.compile(r"Epoch (\d+) Validation Metrics: \{(.+)\}")
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT_DIR = ROOT / "tesis" / "figs"
+SOURCE_EPOCH = 30
 
-    def parse_dict(body):
-        body = re.sub(r"np\.float32\(([^)]*)\)", r"\1", body)
-        d = {}
-        for k, v in re.findall(r"'(\w+)':\s*([-\d.eE]+)", body):
-            d[k] = float(v)
-        return d
+NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 
-    with open(path) as f:
-        for line in f:
-            m = re_tr.search(line)
-            if m:
-                tr[int(m.group(1))] = parse_dict(m.group(2))
+
+@dataclass(frozen=True)
+class RunSpec:
+    label: str
+    directory: Path
+    color: str
+    marker: str
+    linestyle: str = "-"
+    epoch_offset: int = 0
+    uses_source_validation: bool = False
+
+    @property
+    def log_path(self) -> Path:
+        return self.directory / "training.log"
+
+
+RUNS = (
+    RunSpec(
+        label="Baseline desde cero",
+        directory=ROOT / "runs_logs" / "baseline_S-2_newsplit_scratch",
+        color="#0072B2",
+        marker="o",
+    ),
+    RunSpec(
+        label="Baseline +10",
+        directory=ROOT / "runs_logs" / "baseline_S-2_from_newsplit_ckpt_extra10",
+        color="#56B4E9",
+        marker="s",
+        linestyle="--",
+        epoch_offset=SOURCE_EPOCH,
+        uses_source_validation=True,
+    ),
+    RunSpec(
+        label="Shared residual +10",
+        directory=ROOT
+        / "runs_logs"
+        / "moe_shared_residual_from_newsplit_baseline_extra10",
+        color="#D55E00",
+        marker="^",
+        epoch_offset=SOURCE_EPOCH,
+        uses_source_validation=True,
+    ),
+    RunSpec(
+        label="Token-choice K=8",
+        directory=ROOT
+        / "runs_logs"
+        / "moe_token_choice_k8_top2_S-2_scratch",
+        color="#009E73",
+        marker="D",
+    ),
+)
+
+
+plt.rcParams.update(
+    {
+        "font.family": "serif",
+        "font.serif": ["DejaVu Serif", "Times New Roman", "cmr10"],
+        "mathtext.fontset": "dejavuserif",
+        "font.size": 9,
+        "axes.titlesize": 9,
+        "axes.labelsize": 9,
+        "legend.fontsize": 8,
+        "xtick.labelsize": 8,
+        "ytick.labelsize": 8,
+        "axes.linewidth": 0.7,
+        "lines.linewidth": 1.4,
+        "grid.linewidth": 0.5,
+        "grid.alpha": 0.45,
+        "figure.dpi": 150,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.02,
+    }
+)
+
+
+def _parse_python_dict(body: str) -> dict[str, float]:
+    """Extrae únicamente escalares numéricos de un diccionario impreso."""
+    normalized = re.sub(r"np\.float(?:32|64)\(([^)]*)\)", r"\1", body)
+    try:
+        raw = ast.literal_eval("{" + normalized + "}")
+    except (SyntaxError, ValueError):
+        return {}
+
+    parsed: dict[str, float] = {}
+    for key, value in raw.items():
+        if isinstance(value, (int, float)) and math.isfinite(float(value)):
+            parsed[str(key)] = float(value)
+    return parsed
+
+
+def _extract_named(body: str, name: str, *, unit: str = "") -> float | None:
+    pattern = rf"(?<!SSIM\s)\b{re.escape(name)}\s*=\s*({NUMBER})"
+    if unit:
+        pattern += rf"\s*{re.escape(unit)}"
+    match = re.search(pattern, body, flags=re.IGNORECASE)
+    return float(match.group(1)) if match else None
+
+
+def parse_training_log(
+    path: os.PathLike[str] | str,
+) -> tuple[dict[int, dict[str, float]], dict[int, dict[str, float]]]:
+    """Parsea los formatos actuales baseline y MoE.
+
+    Si una corrida fue reanudada y una época aparece más de una vez, conserva
+    la última línea resumen de esa época. Las líneas por paso se ignoran.
+    """
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"No se encontró el log: {path}")
+
+    train: dict[int, dict[str, float]] = {}
+    validation: dict[int, dict[str, float]] = {}
+
+    baseline_train = re.compile(
+        r"^Epoch\s+(\d+)\s+train metrics:\s*\{(.*)\}\s*$"
+    )
+    compact_train = re.compile(r"^Epoch\s+(\d+)\s+train:\s*(.*)$")
+    current_validation = re.compile(
+        r"^Epoch\s+(\d+)\s+validation:\s*(.*)$"
+    )
+
+    with path.open(encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+
+            match = baseline_train.match(line)
+            if match:
+                metrics = _parse_python_dict(match.group(2))
+                if metrics:
+                    train[int(match.group(1))] = metrics
                 continue
-            m = re_va.search(line)
-            if m:
-                va[int(m.group(1))] = parse_dict(m.group(2))
-    return tr, va
 
-
-def parse_no_moe(path):
-    """no-MoE epoch summaries: 'Epoch N train/val metrics: {...}'."""
-    tr, va = {}, {}
-    re_tr = re.compile(r"Epoch (\d+) train metrics: \{(.+)\}")
-    re_va = re.compile(r"Epoch (\d+) val metrics: \{(.+)\}")
-
-    def parse_dict(body):
-        body = re.sub(r"np\.float32\(([^)]*)\)", r"\1", body)
-        d = {}
-        for k, v in re.findall(r"'(\w+)':\s*([-\d.eE]+)", body):
-            d[k] = float(v)
-        return d
-
-    with open(path) as f:
-        for line in f:
-            m = re_tr.search(line)
-            if m:
-                tr[int(m.group(1))] = parse_dict(m.group(2))
+            match = compact_train.match(line)
+            if match:
+                body = match.group(2)
+                metrics = {
+                    key: value
+                    for key, value in {
+                        "loss": _extract_named(body, "loss"),
+                        "psnr_weighted": _extract_named(
+                            body, "weighted", unit="dB"
+                        ),
+                        "psnr_macro": _extract_named(body, "macro", unit="dB"),
+                    }.items()
+                    if value is not None
+                }
+                if metrics:
+                    train[int(match.group(1))] = metrics
                 continue
-            m = re_va.search(line)
-            if m:
-                va[int(m.group(1))] = parse_dict(m.group(2))
-    return tr, va
+
+            match = current_validation.match(line)
+            if match:
+                body = match.group(2)
+                metrics = {
+                    key: value
+                    for key, value in {
+                        "loss": _extract_named(body, "loss"),
+                        "psnr_weighted": _extract_named(
+                            body, "weighted", unit="dB"
+                        ),
+                        "psnr_macro": _extract_named(body, "macro", unit="dB"),
+                    }.items()
+                    if value is not None
+                }
+                if metrics:
+                    validation[int(match.group(1))] = metrics
+
+    if not train:
+        raise ValueError(f"No se encontraron resúmenes de entrenamiento en {path}")
+    if not validation:
+        raise ValueError(f"No se encontraron resúmenes de validación en {path}")
+    return train, validation
 
 
-def series(d, key):
-    ep = sorted(d.keys())
-    return np.array(ep), np.array([d[e][key] for e in ep])
+def _validate_epochs(
+    metrics: Mapping[int, Mapping[str, float]],
+    *,
+    required_key: str,
+    label: str,
+    split: str,
+) -> None:
+    missing = [epoch for epoch, values in metrics.items() if required_key not in values]
+    if missing:
+        raise ValueError(
+            f"{label}: falta {required_key!r} en {split}, épocas {missing}"
+        )
 
 
-# ---------------------------------------------------------------------------
-# Load data
-# ---------------------------------------------------------------------------
-# MoE: corrida 2026-07 desde cero (S-2, random init) con el random_crop corregido.
-# La corrida vieja (moe_outputs/training_outs_2.txt) entrenaba contra parches
-# desalineados y quedo obsoleta.
-moe_tr, moe_va = parse_moe(os.path.join(ROOT, "moe_outputs", "multi_task_scratch.txt"))
-# single_task.txt concatena varios intentos (1-21, 1-15 y la corrida final 1-30);
-# el parser guarda la ULTIMA ocurrencia de cada epoca, que es la corrida completa.
-st_tr, st_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "single_task.txt"))
-mt_tr, mt_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "multi_task.txt"))
-# Fair comparison: multi-task, S-2 backbone, random init (same scale + init as the MoE).
-mts_tr, mts_va = parse_no_moe(os.path.join(ROOT, "no_moe_outputs", "multi_task_scratch.txt"))
-
-NUM_EXPERTS = 5
-LN_K = math.log(NUM_EXPERTS)
-
-# Quick textual summary (also used to sanity-check the LaTeX numbers).
-def best(d, key="psnr"):
-    ep, v = series(d, key)
-    i = int(np.argmax(v))
-    return ep[i], v[i]
-
-print("=== Best validation PSNR (dB) ===")
-for name, d in [("MAXIM multi (S-3 warm)", mt_va),
-                ("MAXIM multi (S-2 scratch)", mts_va),
-                ("MAXIM single-task", st_va),
-                ("MAXIM+MoE", moe_va)]:
-    e, p = best(d)
-    print(f"  {name:26s}: {p:6.2f} dB  (epoch {e})")
-print("=== MoE router (last epoch) ===")
-le = max(moe_tr)
-print(f"  entropy={moe_tr[le]['entropy']:.4f}  ln(K)={LN_K:.4f}  "
-      f"balance={moe_tr[le]['balance']:.4f}")
+def _series(
+    metrics: Mapping[int, Mapping[str, float]],
+    key: str,
+    epoch_offset: int = 0,
+) -> tuple[np.ndarray, np.ndarray]:
+    epochs = sorted(metrics)
+    x = np.asarray([epoch + epoch_offset for epoch in epochs], dtype=np.int64)
+    y = np.asarray([metrics[epoch][key] for epoch in epochs], dtype=np.float64)
+    if not np.all(np.isfinite(y)):
+        raise ValueError(f"La serie {key!r} contiene valores no finitos.")
+    return x, y
 
 
-# ---------------------------------------------------------------------------
-# Figure 1 — Validation PSNR vs epoch (headline comparison, matched budget)
-# ---------------------------------------------------------------------------
-def fig_val_psnr():
-    fig, ax = plt.subplots(figsize=(3.4, 2.7))
-    EMAX = 30  # matched training budget
+def load_runs() -> dict[str, dict[str, object]]:
+    parsed: dict[str, dict[str, object]] = {}
+    for spec in RUNS:
+        train, validation = parse_training_log(spec.log_path)
+        _validate_epochs(
+            train, required_key="loss", label=spec.label, split="train"
+        )
+        _validate_epochs(
+            validation,
+            required_key="psnr_macro",
+            label=spec.label,
+            split="validation",
+        )
+        _validate_epochs(
+            validation,
+            required_key="psnr_weighted",
+            label=spec.label,
+            split="validation",
+        )
+        parsed[spec.label] = {
+            "spec": spec,
+            "train": train,
+            "validation": validation,
+        }
+    return parsed
 
-    for d, c, lab, mk in [
-        (mt_va, C_MULTI, "MAXIM multi-tarea (S-3, pre-entr.)", "o"),
-        (mts_va, C_MULTI_S, "MAXIM multi-tarea (S-2, aleat.)", "D"),
-        (st_va, C_SINGLE, "MAXIM mono-tarea (S-2, aleat.)", "s"),
-        (moe_va, C_MOE, "MAXIM+MoE (S-2, aleat.)", "^"),
-    ]:
-        ep, v = series(d, "psnr")
-        mask = ep <= EMAX
-        ax.plot(ep[mask], v[mask], color=c, marker=mk, markersize=2.8,
-                markevery=2, label=lab)
 
-    ax.set_xlabel("Época")
-    ax.set_ylabel("PSNR de validación (dB)")
-    ax.set_xlim(1, EMAX)
-    ax.set_ylim(12, 27)
+def _source_validation(
+    parsed: Mapping[str, Mapping[str, object]],
+) -> Mapping[str, float]:
+    source = parsed["Baseline desde cero"]["validation"]
+    assert isinstance(source, dict)
+    if SOURCE_EPOCH not in source:
+        raise ValueError(
+            f"El baseline fuente no contiene validación de época {SOURCE_EPOCH}."
+        )
+    return source[SOURCE_EPOCH]
+
+
+def print_summary(parsed: Mapping[str, Mapping[str, object]]) -> None:
+    print("=== Logs reconocidos ===")
+    for spec in RUNS:
+        run = parsed[spec.label]
+        train = run["train"]
+        validation = run["validation"]
+        assert isinstance(train, dict)
+        assert isinstance(validation, dict)
+        train_epochs = sorted(train)
+        val_epochs = sorted(validation)
+        # Ante empates causados por el redondeo del log, mostrar la última
+        # época. La selección real del checkpoint sigue viniendo de su metadata.
+        macro_epoch = max(
+            val_epochs,
+            key=lambda epoch: (validation[epoch]["psnr_macro"], epoch),
+        )
+        weighted_epoch = max(
+            val_epochs,
+            key=lambda epoch: (validation[epoch]["psnr_weighted"], epoch),
+        )
+        print(
+            f"{spec.label:24s} "
+            f"train={train_epochs[0]}..{train_epochs[-1]} ({len(train_epochs)}) | "
+            f"val={val_epochs[0]}..{val_epochs[-1]} ({len(val_epochs)}) | "
+            f"mejor macro={validation[macro_epoch]['psnr_macro']:.4f} "
+            f"(época {macro_epoch + spec.epoch_offset}) | "
+            f"mejor ponderado={validation[weighted_epoch]['psnr_weighted']:.4f} "
+            f"(época {weighted_epoch + spec.epoch_offset})"
+        )
+
+
+def plot_metric(
+    parsed: Mapping[str, Mapping[str, object]],
+    *,
+    split: str,
+    key: str,
+    ylabel: str,
+    output_path: Path,
+    log_scale: bool = False,
+    include_source: bool = False,
+) -> None:
+    fig, ax = plt.subplots(figsize=(5.6, 3.2))
+    source = _source_validation(parsed) if include_source else None
+
+    for spec in RUNS:
+        metrics = parsed[spec.label][split]
+        assert isinstance(metrics, dict)
+        x, y = _series(metrics, key, spec.epoch_offset)
+
+        if include_source and spec.uses_source_validation:
+            assert source is not None
+            x = np.insert(x, 0, SOURCE_EPOCH)
+            y = np.insert(y, 0, float(source[key]))
+
+        ax.plot(
+            x,
+            y,
+            color=spec.color,
+            marker=spec.marker,
+            linestyle=spec.linestyle,
+            markersize=3.0,
+            markevery=max(1, len(x) // 10),
+            label=spec.label,
+        )
+
+    if any(spec.epoch_offset for spec in RUNS):
+        ax.axvline(
+            SOURCE_EPOCH,
+            color="#777777",
+            linestyle=":",
+            linewidth=1.0,
+            label="Inicio de continuaciones",
+        )
+
+    ax.set_xlabel("Época acumulada")
+    ax.set_ylabel(ylabel)
+    if log_scale:
+        ax.set_yscale("log")
     ax.grid(True, linestyle="--")
-    # All curves climb above ~19 dB after the first epochs, so the lower-right
-    # region stays empty for the legend.
-    ax.legend(loc="lower right", frameon=True, framealpha=0.88, edgecolor="none",
-              handlelength=1.6, fontsize=7.0)
-    fig.savefig(os.path.join(OUT, "fig_val_psnr.pdf"))
+    ax.legend(frameon=True, framealpha=0.9, edgecolor="none", ncol=2)
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path)
     plt.close(fig)
+    print(f"Figura escrita: {output_path}")
 
 
-# ---------------------------------------------------------------------------
-# Figure 2 — MoE dynamics: (a) train/val PSNR convergence, (b) uniform routing
-# ---------------------------------------------------------------------------
-def fig_moe_dynamics():
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(7.0, 2.7))
-
-    # (a) PSNR convergence over the 30-epoch run (fixed random_crop)
-    ep, tr = series(moe_tr, "psnr")
-    epv, va = series(moe_va, "psnr")
-    axL.plot(ep, tr, color=C_MOE, label="Entrenamiento")
-    axL.plot(epv, va, color=C_MULTI, label="Validación")
-    axL.set_xlabel("Época")
-    axL.set_ylabel("PSNR (dB)")
-    axL.set_ylim(2, 25)
-    axL.grid(True, linestyle="--")
-    axL.legend(loc="lower right", frameon=False, handlelength=1.6)
-    axL.set_title("(a) PSNR del modelo MoE", fontsize=9)
-
-    # (b) router entropy and balance stay pinned at the uniform regime.
-    # Zoomed axes: entropy moves within [1.600, 1.609] (max ln 5 = 1.6094) and
-    # balance within [1.001, 1.010] (min 1.0), so a full-range axis would show
-    # two flat lines.
-    ep, ent = series(moe_tr, "entropy")
-    _, bal = series(moe_tr, "balance")
-    axR.plot(ep, ent, color=C_MOE, label="Entropía del ruteador")
-    axR.axhline(LN_K, color=C_AUX, linestyle=":", linewidth=1.1,
-                label=r"$\ln K$ (máx., uniforme)")
-    axR.set_xlabel("Época")
-    axR.set_ylabel("Entropía (nats)")
-    axR.set_ylim(1.55, 1.62)
-    axR.grid(True, linestyle="--")
-    axR.set_title("(b) Diagnóstico del ruteador", fontsize=9)
-
-    axR2 = axR.twinx()
-    axR2.plot(ep, bal, color=C_SINGLE, linestyle="--", label="Balance")
-    axR2.axhline(1.0, color=C_SINGLE, linestyle=":", linewidth=0.8, alpha=0.6)
-    axR2.set_ylabel("Balance de carga", color=C_SINGLE)
-    axR2.tick_params(axis="y", labelcolor=C_SINGLE)
-    axR2.set_ylim(0.99, 1.06)
-
-    # merged legend for panel (b)
-    h1, l1 = axR.get_legend_handles_labels()
-    h2, l2 = axR2.get_legend_handles_labels()
-    axR.legend(h1 + h2, l1 + l2, loc="center right", frameon=False,
-               handlelength=1.6, fontsize=7.5)
-
-    fig.tight_layout(w_pad=2.0)
-    fig.savefig(os.path.join(OUT, "fig_moe_dynamics.pdf"))
-    plt.close(fig)
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Directorio de salida (default: {DEFAULT_OUTPUT_DIR})",
+    )
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Valida y resume los logs sin generar ni sobrescribir figuras.",
+    )
+    return parser.parse_args()
 
 
-# The qualitative figures (fig_qualitative.pdf, fig_qualitative_enhance.pdf)
-# are generated by tesis/eval_metrics.py in the Colab/Drive environment with
-# the trained checkpoints + datasets; this script does not touch them.
+def main() -> None:
+    args = parse_args()
+    parsed = load_runs()
+    print_summary(parsed)
 
-fig_val_psnr()
-fig_moe_dynamics()
-print("\nFigures written to", OUT)
-for f in sorted(os.listdir(OUT)):
-    print("  ", f)
+    if args.check_only:
+        print("\nValidación terminada; no se escribieron figuras.")
+        return
+
+    output_dir = args.output_dir.resolve()
+    plot_metric(
+        parsed,
+        split="train",
+        key="loss",
+        ylabel="Pérdida de entrenamiento",
+        output_path=output_dir / "fig_loss.pdf",
+        log_scale=True,
+    )
+    plot_metric(
+        parsed,
+        split="validation",
+        key="psnr_macro",
+        ylabel="PSNR macro de validación (dB)",
+        output_path=output_dir / "fig_psnr_macro.pdf",
+        include_source=True,
+    )
+    plot_metric(
+        parsed,
+        split="validation",
+        key="psnr_weighted",
+        ylabel="PSNR ponderado de validación (dB)",
+        output_path=output_dir / "fig_psnr_weighted.pdf",
+        include_source=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,5 @@
+> **Fork de tesis.** Este repositorio extiende MAXIM con expertos por tarea. El mapa de carpetas está en [docs/ESTRUCTURA.md](docs/ESTRUCTURA.md) y el estado del trabajo en [docs/handoff_optimization_maxim_moe_2026-10-08.md](docs/handoff_optimization_maxim_moe_2026-10-08.md). El resto de este README es el original de Google.
+
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/maxim-multi-axis-mlp-for-image-processing/deblurring-on-hide-trained-on-gopro)](https://paperswithcode.com/sota/deblurring-on-hide-trained-on-gopro?p=maxim-multi-axis-mlp-for-image-processing)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/maxim-multi-axis-mlp-for-image-processing/deblurring-on-gopro)](https://paperswithcode.com/sota/deblurring-on-gopro?p=maxim-multi-axis-mlp-for-image-processing)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/maxim-multi-axis-mlp-for-image-processing/deblurring-on-realblur-j-1)](https://paperswithcode.com/sota/deblurring-on-realblur-j-1?p=maxim-multi-axis-mlp-for-image-processing)

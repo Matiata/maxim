@@ -68,30 +68,6 @@ class TrainState(train_state.TrainState):
     """Extended train state with batch statistics."""
 
     batch_stats: Any = None
-    
-
-def load_image(filepath):
-    """Load and preprocess image."""
-    try:
-        img = Image.open(filepath).convert("RGB")
-        img = np.asarray(img, np.float32) / 255.0
-        return img
-    except Exception as e:
-        print(f"Error loading image {filepath}: {e}")
-        return np.zeros((1, 1, 3), np.float32)
-
-def random_crop(image, target, crop_size):
-    """Random crop for data augmentation."""
-    h, w = image.shape[0], image.shape[1]
-
-    if h > crop_size and w > crop_size:
-        top = np.random.randint(0, h - crop_size)
-        left = np.random.randint(0, w - crop_size)
-
-        image = image[top : top + crop_size, left : left + crop_size]
-        target = target[top : top + crop_size, left : left + crop_size]
-
-    return image, target
 
 
 def random_flip(image, target):
@@ -274,8 +250,57 @@ def main(_):
     rng, init_rng = jax.random.split(rng)
     state = create_train_state(init_rng, model, learning_rate_fn, FLAGS.weight_decay)
 
+def load_image(filepath):
+    """Load and preprocess image."""
+    img = Image.open(filepath).convert("RGB")
+    img = np.asarray(img, np.float32) / 255.0
+    return img
+
+
+def random_crop(image, target, crop_size):
+    """Random crop with security padding if the image is smaller than the crop size."""
+    h_i, w_i = image.shape[0], image.shape[1]
+    h_t, w_t = target.shape[0], target.shape[1]
+
+    # 1. Calculate necessary padding if the image is smaller than the crop
+    pad_h_i = max(0, crop_size - h_i)
+    pad_w_i = max(0, crop_size - w_i)
+    pad_h_t = max(0, crop_size - h_t)
+    pad_w_t = max(0, crop_size - w_t)
+
+    if pad_h_i > 0 or pad_w_i > 0:
+        print("padding image", pad_h_i, pad_w_i)
+        # Use reflect padding to avoid black borders
+        image = np.pad(image, ((0, pad_h_i), (0, pad_w_i), (0, 0)), mode="reflect")
+        # Actualizamos dimensiones
+        h_i, w_i = image.shape[0], image.shape[1]
+    if pad_h_t > 0 or pad_w_t > 0:
+        print("padding target", pad_h_t, pad_w_t)
+        target = np.pad(target, ((0, pad_h_t), (0, pad_w_t), (0, 0)), mode="reflect")
+        # Actualizamos dimensiones
+        h_t, w_t = target.shape[0], target.shape[1]
+    
+    # 2. Crop: a SINGLE (top, left) shared by image and target so both patches
+    #    stay spatially aligned.
+    h = min(h_i, h_t)
+    w = min(w_i, w_t)
+    top = np.random.randint(0, h - crop_size + 1)
+    left = np.random.randint(0, w - crop_size + 1)
+    image = image[top : top + crop_size, left : left + crop_size]
+    target = target[top : top + crop_size, left : left + crop_size]
+
+    return image, target
 
 
 
 if __name__ == "__main__":
-    app.run(main)
+    # app.run(main)
+    input_img = "./images/train_test.png"
+    target_img = "./images/gt_test.png"
+    input_img = load_image(input_img)
+    target_img = load_image(target_img)
+    print("original image shape: ", input_img.shape, target_img.shape)
+    input_img, target_img = random_crop(input_img, target_img, 256)
+    print("cropped image shape: ", input_img.shape, target_img.shape)
+
+
