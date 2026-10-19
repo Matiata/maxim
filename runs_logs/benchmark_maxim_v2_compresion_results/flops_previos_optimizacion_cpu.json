@@ -1,0 +1,127 @@
+{
+ "description": "FLOPs del programa previo a la optimización (HloCostAnalysis sobre jax.jit(...).lower()), calculados en CPU con shapes abstractas. Reemplazan la columna vacía del benchmark: en GPU lowered.cost_analysis() devolvió None y el análisis del ejecutable compilado no cuenta las convoluciones de cuDNN. 'gb_accessed' corresponde al programa sin fusionar y no es comparable con el tráfico real.",
+ "date": "2026-10-19",
+ "repo_commit": "6fd4db9f25fcba149c192781de3c8743d87e2f3f",
+ "jax": "0.10.2",
+ "flax": "0.11.2",
+ "inference_batch": 1,
+ "training": "value_and_grad de una L1 sobre todas las salidas, batch 2, 256x256, sin optimizador",
+ "results": {
+  "inference/256/B0": {
+   "gflop": 216.334630912,
+   "gb_accessed": 81.030545408
+  },
+  "inference/512/B0": {
+   "gflop": 942.119845888,
+   "gb_accessed": 324.365320192
+  },
+  "inference/256/S0": {
+   "gflop": 229.200658432,
+   "gb_accessed": 85.031714816
+  },
+  "inference/512/S0": {
+   "gflop": 993.715683328,
+   "gb_accessed": 340.369014784
+  },
+  "inference/256/S0_sel": {
+   "gflop": 218.907705344,
+   "gb_accessed": 81.94822144
+  },
+  "inference/512/S0_sel": {
+   "gflop": 952.438226944,
+   "gb_accessed": 328.029044736
+  },
+  "inference/256/S1_d32": {
+   "gflop": 200.53000192,
+   "gb_accessed": 81.824260096
+  },
+  "inference/512/S1_d32": {
+   "gflop": 878.12931584,
+   "gb_accessed": 327.559020544
+  },
+  "inference/256/S2_d32": {
+   "gflop": 200.530067456,
+   "gb_accessed": 81.909407744
+  },
+  "inference/512/S2_d32": {
+   "gflop": 878.12931584,
+   "gb_accessed": 327.895810048
+  },
+  "inference/256/S2_d32_todos": {
+   "gflop": 202.852073472,
+   "gb_accessed": 83.306635264
+  },
+  "inference/512/S2_d32_todos": {
+   "gflop": 887.421272064,
+   "gb_accessed": 333.4701056
+  },
+  "inference/256/S1_d64": {
+   "gflop": 201.095806976,
+   "gb_accessed": 81.98656
+  },
+  "inference/512/S1_d64": {
+   "gflop": 880.393322496,
+   "gb_accessed": 328.205729792
+  },
+  "inference/256/S2_d64": {
+   "gflop": 201.095970816,
+   "gb_accessed": 82.089746432
+  },
+  "inference/512/S2_d64": {
+   "gflop": 880.393453568,
+   "gb_accessed": 328.610873344
+  },
+  "inference/256/S0_sel_sin_rcab2": {
+   "gflop": 199.959937024,
+   "gb_accessed": 81.561280512
+  },
+  "inference/512/S0_sel_sin_rcab2": {
+   "gflop": 875.848269824,
+   "gb_accessed": 326.509658112
+  },
+  "inference/256/ref_sin_cross_gating": {
+   "gflop": 185.658114048,
+   "gb_accessed": 63.654199296
+  },
+  "inference/512/ref_sin_cross_gating": {
+   "gflop": 819.58862848,
+   "gb_accessed": 254.887264256
+  },
+  "inference/256/ref_sin_gmlp": {
+   "gflop": 154.300153856,
+   "gb_accessed": 36.051255296
+  },
+  "inference/512/ref_sin_gmlp": {
+   "gflop": 693.98167552,
+   "gb_accessed": 144.037363712
+  },
+  "training/B0:full": {
+   "gflop": 1270.597287936,
+   "gb_accessed": 618.802839552
+  },
+  "training/S0_sel:full": {
+   "gflop": 1285.999034368,
+   "gb_accessed": 623.318663168
+  },
+  "training/S0:full": {
+   "gflop": 1347.611000832,
+   "gb_accessed": 638.982291456
+  },
+  "training/S2_d32:full": {
+   "gflop": 1175.752015872,
+   "gb_accessed": 623.167930368
+  },
+  "training/S1_d32:new_only": {
+   "gflop": 749.714669568,
+   "gb_accessed": 555.497160704
+  },
+  "training/S2_d32:new_only": {
+   "gflop": 749.71480064,
+   "gb_accessed": 555.831590912
+  },
+  "training/B0_remat:full": {
+   "gflop": 1645.478674432,
+   "gb_accessed": 999.653507072
+  }
+ }
+}

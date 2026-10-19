@@ -37,6 +37,10 @@ Esta sección resume lo ocurrido desde el 8 de octubre y **prevalece sobre las s
 
 **Reorganización del 15/10.** Los notebooks vigentes están en `notebooks/`, la documentación en `docs/`, los logs y resultados en `runs_logs/` y lo obsoleto en `archivo/`. El mapa completo está en `docs/ESTRUCTURA.md`. El resultado del benchmark v1 está en `runs_logs/benchmark_v1_20261013/`.
 
+**Benchmark v2 completado el 18/10.** Resultados en `runs_logs/benchmark_maxim_v2_compresion_results/` y análisis en `docs/analisis_benchmark_v2_20261019.md`. Todas las verificaciones pasaron. S2_d32 reduce 13,5 % los parámetros y 7,3 % los FLOPs frente al baseline, con latencia prácticamente igual. Seleccionar el experto no cuesta nada en inferencia. Adaptar sólo los módulos nuevos cuesta la mitad de un paso completo. Los FLOPs de GPU no sirven: `flops_previos_optimizacion_cpu.json` los reemplaza. Decisión propuesta: d=32 para la adaptación de S1 y S2.
+
+**Notebooks de adaptación y validación, 19/10.** `notebooks/entrenamiento/adaptacion_compresion.ipynb` adapta S1_d32 o S2_d32 desde shared +10, con el profesor S0_sel congelado. Usa reconstrucción, destilación de la salida final y destilación de las salidas de las 8 RCAB sustituidas. La salida de los módulos nuevos arranca en cero y por defecto corre 5 épocas sólo con módulos nuevos. Los datos son deterministas por época, así que S1 y S2 ven los mismos batches y reanudar da resultados bit a bit iguales. `notebooks/evaluacion/validacion_compresion.ipynb` compara B0, S0_sel, S1 y S2 en float32 y bf16 sobre validación, con bootstrap pareado, y cruza calidad con costo. Ambos se validaron en CPU con datos y checkpoints sintéticos. Ninguno usa test.
+
 ## 1. Decisión y objetivo
 
 En la reunión con los profesores se decidió orientar la siguiente fase a reducir el costo computacional conservando calidad. La evidencia actual no permite asegurar una mejora robusta de calidad frente al baseline. Esto no equivale a haber realizado una prueba formal de significancia.
@@ -234,7 +238,7 @@ No iniciar una búsqueda amplia de arquitecturas, cambios de dataset, nuevos rou
 
 ## Instrucción para el próximo encargo
 
-Pendiente de que el usuario entregue `benchmark_v2_results.json`, `diagnostico_v2_compresion.md` y la carpeta `hlo/` del benchmark v2. Con esos artefactos:
+Los pasos 1 a 3 ya están hechos en `docs/analisis_benchmark_v2_20261019.md`. Queda el paso 4, con d=32, y la evaluación de bf16 en validación como ablación separada.
 
 1. Verificar las comprobaciones del JSON: selección efectiva de la cabeza y del banco, equivalencias, pérdida conservada con rematerialización.
 2. Tabular para B0, S0_sel, S1 y S2 los parámetros totales y por tarea, FLOPs previos a la optimización, latencia, temporales de memoria y costo del paso de entrenamiento. Comparar contra S0_sel y contra B0.
