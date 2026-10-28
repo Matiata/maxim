@@ -9,9 +9,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ADAPTATION = REPO_ROOT / "notebooks" / "entrenamiento" / "adaptacion_compresion.ipynb"
 ADAPTATION_SEED2 = (REPO_ROOT / "notebooks" / "entrenamiento"
                     / "adaptacion_compresion_semilla2.ipynb")
+ADAPTATION_L012 = (REPO_ROOT / "notebooks" / "entrenamiento"
+                   / "adaptacion_compresion_todos_niveles.ipynb")
 VALIDATION = REPO_ROOT / "notebooks" / "evaluacion" / "validacion_compresion.ipynb"
 TEST = REPO_ROOT / "notebooks" / "evaluacion" / "test_final_compresion.ipynb"
-ALL = (ADAPTATION, ADAPTATION_SEED2, VALIDATION, TEST)
+ALL = (ADAPTATION, ADAPTATION_SEED2, ADAPTATION_L012, VALIDATION, TEST)
 
 
 def code_source(path):
@@ -94,6 +96,30 @@ class CompressionNotebooksTest(unittest.TestCase):
         self.assertEqual(len(different), 1)
         x, y = different[0]
         self.assertEqual(x.replace('REPLICA = "v1"', 'REPLICA = "v2"'), y)
+
+    def test_all_levels_notebook_only_changes_replaced_levels(self):
+        # Opción 1: mismo protocolo que S1/S2_d32; sólo cambian los niveles.
+        first, _ = code_source(ADAPTATION)
+        second, source = code_source(ADAPTATION_L012)
+        a = ["".join(c["source"]) for c in first["cells"] if c["cell_type"] == "code"]
+        b = ["".join(c["source"]) for c in second["cells"] if c["cell_type"] == "code"]
+        self.assertEqual(len(b), len(a) + 1)
+        self.assertTrue(b[-1].startswith("# 11. Comparación"))
+        changed = [x.split("\n")[0] for x, y in zip(a, b) if x != y]
+        self.assertEqual(changed, [
+            "# 3. Configuración: elegir la variante; el resto es el protocolo común",
+            "# 8. Crear o reanudar la corrida"])
+        protocol = lambda text: text[text.index("TASKS = ["):
+                                     text.index("if VARIANT not in")]
+        config = next(x for x in b if x.startswith("# 3. Configuración"))
+        self.assertEqual(protocol(a[2]), protocol(config))
+        for marker in ('VARIANT = "S2_d32_l012"', '"rcab_mixer_levels": (0, 1, 2)',
+                       '"rcab_mixer_width": 32', "VARIANTS.update(OPTION1_VARIANTS)",
+                       '"variant_spec": json_safe(VARIANTS[VARIANT])',
+                       "CRITERION_MACRO_DB = 0.05", "CRITERION_TASK_DB = 0.10"):
+            self.assertIn(marker, source)
+        self.assertNotIn('"test")', source.replace(
+            'for split in ("train", "val", "test"):', ""))
 
     def test_final_test_notebook(self):
         _, source = code_source(TEST)
