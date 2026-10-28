@@ -134,7 +134,7 @@ Los expertos por tarea permiten achicar MAXIM un 13,5 % sin perder calidad. Un m
 3. **Especializar casi no cuesta:** 2,3 % más de parámetros guardados que el módulo común, y el mismo tiempo de ejecución.
 4. **La adaptación es barata:** se entrenan sólo los módulos nuevos, con la mitad de tiempo y memoria por paso.
 
-**Próximo paso propuesto:** llevar los expertos también a las convoluciones RCAB de los dos niveles menos profundos, de 32 y 64 canales. Ahorraría unos 0,6 M parámetros más, y S2 quedaría cerca de 18 % por debajo del baseline. Usa el mismo código y el mismo protocolo de adaptación, y se decide sólo con validación.
+**Próximo paso propuesto:** llevar los expertos también a las convoluciones RCAB de los dos niveles menos profundos, de 32 y 64 canales. S2 quedaría 16,8 % por debajo del baseline en parámetros y 23,3 % en FLOPs, contra 7,3 % hoy. Los FLOPs bajan más porque las RCAB de los niveles menos profundos tienen menos canales pero procesan más píxeles, y cuestan casi lo mismo en operaciones que las del nivel profundo. Usa el mismo código y el mismo protocolo de adaptación, y se decide sólo con validación.
 
 **Paso posible después de la opción 1: usar el modelo sin conocer la tarea.** Hoy S2 necesita el `task_id` de cada imagen. Calcular los cinco expertos no lo reemplaza: igual hay que elegir uno, y promediarlos aplicaría correcciones de otras degradaciones.
 
