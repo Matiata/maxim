@@ -7,7 +7,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ADAPTATION = REPO_ROOT / "notebooks" / "entrenamiento" / "adaptacion_compresion.ipynb"
+ADAPTATION_SEED2 = (REPO_ROOT / "notebooks" / "entrenamiento"
+                    / "adaptacion_compresion_semilla2.ipynb")
 VALIDATION = REPO_ROOT / "notebooks" / "evaluacion" / "validacion_compresion.ipynb"
+TEST = REPO_ROOT / "notebooks" / "evaluacion" / "test_final_compresion.ipynb"
+ALL = (ADAPTATION, ADAPTATION_SEED2, VALIDATION, TEST)
 
 
 def code_source(path):
@@ -20,7 +24,7 @@ def code_source(path):
 class CompressionNotebooksTest(unittest.TestCase):
 
     def test_cells_are_clean_and_parse(self):
-        for path in (ADAPTATION, VALIDATION):
+        for path in ALL:
             notebook, _ = code_source(path)
             for index, cell in enumerate(notebook["cells"]):
                 if cell["cell_type"] != "code":
@@ -30,7 +34,7 @@ class CompressionNotebooksTest(unittest.TestCase):
                 ast.parse("".join(cell["source"]), filename=f"{path.name}:{index}")
 
     def test_pinned_model_sources_match_repository(self):
-        for path in (ADAPTATION, VALIDATION):
+        for path in ALL:
             _, source = code_source(path)
             match = re.search(r"EXPECTED_SOURCE_SHA256 = (\{.*?\})\n", source, re.S)
             self.assertIsNotNone(match, path.name)
@@ -62,14 +66,74 @@ class CompressionNotebooksTest(unittest.TestCase):
     def test_validation_protocol(self):
         _, source = code_source(VALIDATION)
         for marker in (
-            '"split": "val"', "same_adaptation_protocol",
-            "adaptation_teacher_is_shared_checkpoint", "def paired_bootstrap",
-            'BF16_MODELS = ["B0", "S0_sel", "S1_d32", "S2_d32"]',
-            '("S2_d32", "S1_d32")', "REFERENCE_TOLERANCE_DB",
-            "REQUIRE_COMPLETE_ADAPTATION = True",
+            'SPLIT = "val"', 'REPLICAS = ["v1", "v2"]',
+            "same_protocol_within_replica",
+            "same_protocol_except_seeds_across_replicas",
+            "distinct_seeds_per_replica",
+            "adaptation_teacher_is_shared_checkpoint", "def stratified_bootstrap",
+            "SEED_AVERAGED", "REFERENCE_TOLERANCE_DB",
+            "REQUIRE_COMPLETE_ADAPTATION = True", "compresion_validacion_semillas",
         ):
             self.assertIn(marker, source)
         self.assertNotIn("save_checkpoint", source)
+
+    def test_replica_seeds_keep_original_protocol(self):
+        # v1 must keep the seeds of the runs already completed (protocol hash).
+        _, source = code_source(ADAPTATION)
+        self.assertIn('"v1": {"seed": 42, "new_module_seed": 1234}', source)
+        self.assertIn('REPLICA = "v1"', source)
+        self.assertIn("RUN_TAG = REPLICA", source)
+
+    def test_seed2_notebook_only_changes_replica_default(self):
+        first, _ = code_source(ADAPTATION)
+        second, _ = code_source(ADAPTATION_SEED2)
+        a = ["".join(c["source"]) for c in first["cells"] if c["cell_type"] == "code"]
+        b = ["".join(c["source"]) for c in second["cells"] if c["cell_type"] == "code"]
+        self.assertEqual(len(a), len(b))
+        different = [(x, y) for x, y in zip(a, b) if x != y]
+        self.assertEqual(len(different), 1)
+        x, y = different[0]
+        self.assertEqual(x.replace('REPLICA = "v1"', 'REPLICA = "v2"'), y)
+
+    def test_final_test_notebook(self):
+        _, source = code_source(TEST)
+        for marker in (
+            'SPLIT = "test"', 'CONFIRM_TEST_RUN = False',
+            "Poner CONFIRM_TEST_RUN = True",
+            '"B0": 28.12742717709229, "S0_sel": 28.13664076320675',
+            "compresion_test_final", '"primary_analysis"',
+        ):
+            self.assertIn(marker, source)
+        self.assertNotIn("save_checkpoint", source)
+        self.assertNotIn("BF16_MODELS = [\"", source)
+
+    def test_cache_does_not_retain_full_images(self):
+        # Un recorte de NumPy es una vista: sin copiar, cada crop retenía la
+        # imagen completa y el caché de test agotó la RAM de Colab.
+        cells = []
+        for path in ALL:
+            notebook, _ = code_source(path)
+            cells.append(next(
+                "".join(c["source"]) for c in notebook["cells"]
+                if "".join(c["source"]).startswith("# Validación en memoria")))
+            self.assertIn("left:left + crop_size].copy()", cells[-1], path.name)
+            self.assertIn("ThreadPoolExecutor(max_workers=LOAD_WORKERS)", cells[-1])
+            self.assertIn(
+                'task_path = cache_path.with_name(f"{cache_path.stem}_{task}.npz")',
+                cells[-1])
+        self.assertEqual(len(set(cells)), 1)
+
+    def test_validation_and_test_share_evaluation_code(self):
+        val, _ = code_source(VALIDATION)
+        test, _ = code_source(TEST)
+        shared = ("# Validación en memoria", "# 6. Evaluación por modelo",
+                  "# 7. Diferencias pareadas", "# Restauración estricta")
+        for prefix in shared:
+            a = next("".join(c["source"]) for c in val["cells"]
+                     if "".join(c["source"]).startswith(prefix))
+            b = next("".join(c["source"]) for c in test["cells"]
+                     if "".join(c["source"]).startswith(prefix))
+            self.assertEqual(a, b, prefix)
 
 
 if __name__ == "__main__":
