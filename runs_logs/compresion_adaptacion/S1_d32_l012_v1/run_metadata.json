@@ -1,0 +1,307 @@
+{
+  "variant": "S1_d32_l012",
+  "variant_spec": {
+    "family": "shared_selective",
+    "init": "shared_plus_new",
+    "maxim": {
+      "rcab_mixer": "bottleneck",
+      "rcab_mixer_levels": [
+        0,
+        1,
+        2
+      ],
+      "rcab_mixer_width": 32,
+      "rcab_mixer_num_experts": 1
+    }
+  },
+  "run_tag": "v1",
+  "protocol": {
+    "schema_version": 1,
+    "source": {
+      "relative_run": "moe_shared_residual_from_newsplit_baseline_extra10",
+      "epoch": 8,
+      "expected_step": 16000,
+      "val_macro": 32.06335479306456
+    },
+    "teacher": "S0_sel (shared +10, selección efectiva), congelado, train=False",
+    "model_config": {
+      "variant": "S-2",
+      "dropout_rate": 0.1,
+      "num_outputs": 3,
+      "use_bias": true,
+      "num_supervision_scales": 3
+    },
+    "phases": [
+      {
+        "name": "modulos_nuevos",
+        "scope": "new_only",
+        "epochs": 5,
+        "learning_rate": 0.001,
+        "warmup_steps": 1000,
+        "weight_decay": 0.0001
+      }
+    ],
+    "steps_per_epoch": 2000,
+    "batch_size": 2,
+    "patch_size": 256,
+    "eval_patch_size": 256,
+    "seed": 42,
+    "new_module_seed": 1234,
+    "zero_init_new_output": true,
+    "loss": {
+      "reconstruction": "L1 final + L1 de supervisión profunda normalizada",
+      "auxiliary_weight": 1.0,
+      "distill_output_weight": 1.0,
+      "feature_distill_weight": 0.1,
+      "feature_distill": "MSE / energía del profesor, salidas de las RCAB sustituidas"
+    },
+    "optimizer": "clip_by_global_norm + AdamW; momentos nuevos en cada fase",
+    "clip_norm": 1.0,
+    "sampling": "uniforme por tarea; orden y aumentaciones deterministas por época",
+    "selection": "psnr_macro de validación, incluida la época 0",
+    "student_dropout": 0.1,
+    "student_remat_blocks": false
+  },
+  "protocol_hash": "41431fd79c87a7c7c1a48727b2dcaf3360fbd92092c4fcbd97d64b366dc00dac",
+  "comparable_protocol_hash": "81c1bc489a694edf75b8c4ab86a9b5199cf9cbcf7992cc3a43b307931d449ecb",
+  "split_manifest": {
+    "deblur": {
+      "train": {
+        "count": 7812,
+        "sha256": "9a2a5b0d07b3b5191c169f739bc1ac1c36b5504475cec49b487f422f206c8556"
+      },
+      "val": {
+        "count": 868,
+        "sha256": "2a0cae3d5174e3adf97b974e6618876c2fb9c1186e5b5b78794259af3267798c"
+      },
+      "test": {
+        "count": 3150,
+        "sha256": "1e10941c7d66a7d965f403ea1cb629973e136263a3055f646b269717a1782c00"
+      }
+    },
+    "dehaze": {
+      "train": {
+        "count": 561,
+        "sha256": "89bd2f54550404f9d3ab46871cf6a6479da9ccd6b6b94c42cee1549947ab7827"
+      },
+      "val": {
+        "count": 66,
+        "sha256": "e2683e5bfffbc93b7851e13b6df11454de0d446ce83213c70129eca6a5eef8d4"
+      },
+      "test": {
+        "count": 383,
+        "sha256": "4ccb46026dfca10659bbac3a0e274c92e7fa11970b010072a479deec02a9873c"
+      }
+    },
+    "denoise": {
+      "train": {
+        "count": 3987,
+        "sha256": "8fc97cda0cfb50cb800b3b874836419710ab3a70f4acd991b205424d847e2733"
+      },
+      "val": {
+        "count": 463,
+        "sha256": "55c42c0d9f399903ce432e01d75eb00461d74278ffe4bc100d65183e85eaa0ec"
+      },
+      "test": {
+        "count": 767,
+        "sha256": "45fb0b36422f23d017ec2d95957043c2b64301e9423d16766f594cab618ed419"
+      }
+    },
+    "derain": {
+      "train": {
+        "count": 3240,
+        "sha256": "b121b7a2dc7f1ac2e4f854ebe837847a26ad57270d159db435a201a97901b8bd"
+      },
+      "val": {
+        "count": 360,
+        "sha256": "38e94fbfe3508d7c373deb5ac0f7c59a18064c656baf045b1db59c3470d22557"
+      },
+      "test": {
+        "count": 400,
+        "sha256": "5762ed7ecafe1dc00d87dc2d85dcb00be17369f6cfcafcc39d17b0df7e182012"
+      }
+    },
+    "enhance": {
+      "train": {
+        "count": 4923,
+        "sha256": "3c2e412e85538424e20d912525e36a7990abed179470fdd5db993f3cea0beeb7"
+      },
+      "val": {
+        "count": 546,
+        "sha256": "5ffdbe92a2f490449603279679bcb08c8b11eeea1bd3cb576b53e6337e24fb53"
+      },
+      "test": {
+        "count": 30,
+        "sha256": "135c13a51a49b27b4320f8c96b55a0fcfcf4af63bb7fd2b0abea3dd9f3775464"
+      }
+    }
+  },
+  "teacher_source": {
+    "checkpoint": "/content/gdrive/MyDrive/Facultad/tesis/ckpts/moe_shared_residual_from_newsplit_baseline_extra10/best_checkpoint/checkpoint_8",
+    "restored_step": 16000,
+    "params_sha256": "2ff7f01e6d084ca11ce732d155e57909facc8782e79fedea9a4bce41eda86619",
+    "selection": {
+      "epoch": 8,
+      "selection_metric": "psnr_macro",
+      "selection_value": 32.06335479306456,
+      "psnr_macro": 32.06335479306456,
+      "psnr_weighted": 27.420715888582826,
+      "task_names": [
+        "deblur",
+        "dehaze",
+        "denoise",
+        "derain",
+        "enhance"
+      ],
+      "task_psnr": [
+        24.938868087557605,
+        51.04339044744318,
+        34.22484349689525,
+        27.268150499131945,
+        22.841521434294872
+      ],
+      "task_count": [
+        868,
+        66,
+        463,
+        360,
+        546
+      ],
+      "ssim_macro": 0.8576202909116326,
+      "ssim_weighted": 0.8185716861753012,
+      "task_ssim": [
+        0.750055902015229,
+        0.980146465879498,
+        0.838928486307033,
+        0.8470399644639757,
+        0.8719306358924279
+      ],
+      "ssim_config": {
+        "data_range": 1.0,
+        "filter_size": 11,
+        "filter_sigma": 1.5,
+        "k1": 0.01,
+        "k2": 0.03,
+        "color_space": "RGB",
+        "channel_reduction": "mean",
+        "padding": "VALID",
+        "clipping": "none"
+      }
+    }
+  },
+  "transplant": {
+    "copied_tensors": 1694,
+    "copied_parameters": 11172833,
+    "new_tensors": 144,
+    "new_parameters": 124928,
+    "removed_tensors": 96,
+    "removed_parameters": 3100160
+  },
+  "parameters": {
+    "total": 11297761,
+    "new_modules": 124928
+  },
+  "sessions": [
+    {
+      "python": "3.13.16",
+      "packages": {
+        "jax": "0.10.2",
+        "jaxlib": "0.10.2",
+        "flax": "0.11.2",
+        "optax": "0.2.8",
+        "orbax-checkpoint": "0.12.8",
+        "numpy": "2.1.3",
+        "tensorflow": "2.21.0"
+      },
+      "device": "cuda:0",
+      "device_kind": "NVIDIA L4",
+      "repo_commit": "29bfb2f8764649c3799305103539b6e8a49699ac",
+      "source_sha256": {
+        "maxim/models/maxim.py": "5f8a4e005ffc5b12b5dcfbd9b2a06cab0125dbbdb97813c4b1f8ea1b2d5bf57a",
+        "maxim/models/compression.py": "b460019514b05dd0b0bbe828f2d145aa12dbc443e36554b0fc735dbc84636c4c",
+        "maxim/models/compat.py": "cebfaa8bcd5eaf947c3d98962a3e2266e44265b16f0836b2d5c878581abe610c"
+      },
+      "mem_fraction": "0.90",
+      "smoke_test": false,
+      "timestamp_utc": "2026-10-29T21:04:05Z"
+    }
+  ],
+  "teacher_validation": {
+    "psnr_macro": 32.063332452803294,
+    "psnr_weighted": 27.420708263950456,
+    "ssim_macro": 0.8576202734358542,
+    "ssim_weighted": 0.8185716051150549,
+    "task_psnr": [
+      24.938859795645087,
+      51.04328788410533,
+      34.22483771717574,
+      27.268169911702476,
+      22.84150695538783
+    ],
+    "task_ssim": [
+      0.7500555993911857,
+      0.9801464821353103,
+      0.8389282010286467,
+      0.8470402730835809,
+      0.8719308115405477
+    ],
+    "task_count": [
+      868,
+      66,
+      463,
+      360,
+      546
+    ],
+    "sample_count": 2303
+  },
+  "teacher_validation_diff_db": 2.2340261267572714e-05,
+  "completed_epochs": 5,
+  "best": {
+    "epoch": 5,
+    "selection_metric": "psnr_macro",
+    "selection_value": 30.938550830374773,
+    "psnr_macro": 30.938550830374773,
+    "psnr_weighted": 26.98977573881758,
+    "task_names": [
+      "deblur",
+      "dehaze",
+      "denoise",
+      "derain",
+      "enhance"
+    ],
+    "task_psnr": [
+      24.763960518595262,
+      46.99226873571222,
+      33.61412993363119,
+      26.518944891293845,
+      22.803450072641336
+    ],
+    "task_count": [
+      868,
+      66,
+      463,
+      360,
+      546
+    ],
+    "ssim_macro": 0.8471179650481115,
+    "ssim_weighted": 0.8083335286021699,
+    "task_ssim": [
+      0.7427202107273214,
+      0.9750984265948787,
+      0.8263459064018134,
+      0.8256015111174848,
+      0.8658237703990587
+    ],
+    "ssim_config": {
+      "data_range": 1.0,
+      "filter_size": 11,
+      "filter_sigma": 1.5,
+      "k1": 0.01,
+      "k2": 0.03,
+      "color_space": "RGB",
+      "channel_reduction": "mean",
+      "padding": "VALID",
+      "clipping": "none"
+    }
+  }
+}

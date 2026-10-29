@@ -73,6 +73,26 @@ Esta sección resume lo ocurrido desde el 8 de octubre y **prevalece sobre las s
 - **Criterio, fijado antes de correr, sólo con validación.** Es favorable si el mejor `S2_d32_l012` queda a menos de 0,05 dB del profesor en PSNR macro y ninguna tarea cae más de 0,10 dB frente a él. La última celda lo calcula y compara con S1_d32_v1 y S2_d32_v1 en `comparacion.md`. Si no se cumple, se descarta la rama.
 - **Orden.** Primero `S2_d32_l012` v1. Si es favorable, `S1_d32_l012` v1 como control. Después, la segunda semilla y la latencia en el benchmark.
 
+**Opción 1, resultados del 29/10: no favorable.** Se corrieron `S2_d32_l012` v1 y, aunque no cumplió, también `S1_d32_l012` v1 como control. Resultados en `runs_logs/compresion_adaptacion/S{1,2}_d32_l012_v1/`. Las dos eligieron la época 5, la última. Validación, Δ frente al profesor S0_sel:
+
+| Variante | Params vs B0 | GFLOP vs B0 | Macro | Δ macro | Ponderado | deblur | dehaze | denoise | derain | enhance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| S1_d32 v1 | −15,5 % | −7,3 % | 32,022 | −0,042 | 27,416 | +0,05 | −0,13 | +0,03 | −0,14 | −0,01 |
+| S2_d32 v1 | −13,5 % | −7,3 % | 32,133 | +0,070 | 27,481 | +0,13 | +0,20 | +0,01 | −0,01 | +0,03 |
+| S1_d32_l012 v1 | −20,3 % | −23,3 % | 30,939 | −1,125 | 26,990 | −0,17 | −4,05 | −0,61 | −0,75 | −0,04 |
+| S2_d32_l012 v1 | −16,8 % | −23,3 % | 31,686 | −0,378 | 27,417 | +0,23 | −1,82 | +0,04 | −0,42 | +0,09 |
+
+- **S2_d32_l012 no cumple el criterio.** La pérdida se concentra en dehaze y derain; en deblur, denoise y enhance iguala o supera al profesor, y el ponderado queda a 0,004 dB.
+- **El valor de los expertos crece con la compresión.** S2 − S1 pasa de +0,11 dB macro con sólo el nivel 2 a +0,75 dB con los tres niveles: dehaze +2,23, denoise +0,65, derain +0,32, deblur +0,40, enhance +0,13. Es un argumento para la tesis: cuanto menos capacidad local queda, más importa que la corrección sea específica de la tarea.
+- **Más épocas difícilmente alcanzan.** La ganancia por época de S2_d32_l012 bajó a +1,13, +0,38 y +0,08 dB macro; dehaze todavía subía 0,3 dB por época, pero le faltaban 1,8. No se agregó la fase extra.
+- **Los GFLOP de `comparacion.md` salieron vacíos.** En Colab `Lowered.cost_analysis()` usa el backend del dispositivo por defecto, la GPU, aunque se baje para CPU, y devuelve None. Los valores de la tabla son locales. El notebook de niveles 1 y 2 lo corrige analizando con la CPU como dispositivo por defecto.
+- **Decisión.** No se descarta la rama todavía: se prueba el punto intermedio con niveles 1 y 2 para ver si la pérdida viene del nivel 0.
+
+**Compresión intermedia, notebook del 29/10 (misma rama).** `notebooks/entrenamiento/adaptacion_compresion_niveles_1_2.ipynb` lleva el módulo de ancho 32 a las 16 RCAB de los niveles 1 y 2. Variantes `S2_d32_l12` y `S1_d32_l12`, registradas en el notebook igual que las l012. Protocolo idéntico, incluido su hash.
+- **Costo, programa sin optimizar a 256×256.** `S2_d32_l12` tiene 11.848.161 parámetros, −16,4 % frente a B0, y 182,6 GFLOP, −15,6 %. `S1_d32_l12` tiene 11.426.273, −19,4 %. Casi todo el ahorro de parámetros de l012 ya está en l12: el nivel 0 sólo suma 51 mil parámetros menos en S2, porque con 32 canales el módulo de ancho 32 no comprime. El nivel 0 aporta en cambio 7,7 puntos de FLOPs.
+- **Criterio.** El mismo de la opción 1: el mejor `S2_d32_l12` a menos de 0,05 dB del profesor en macro de validación y ninguna tarea por debajo de −0,10 dB. La última celda compara con las corridas v1 de S1/S2_d32 y S1/S2_d32_l012.
+- **Orden.** `S2_d32_l12` v1 y después `S1_d32_l12` v1, que se corre siempre para medir S2 − S1 con dos niveles sustituidos.
+
 ## 1. Decisión y objetivo
 
 En la reunión con los profesores se decidió orientar la siguiente fase a reducir el costo computacional conservando calidad. La evidencia actual no permite asegurar una mejora robusta de calidad frente al baseline. Esto no equivale a haber realizado una prueba formal de significancia.
