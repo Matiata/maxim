@@ -9,6 +9,8 @@ __pycache__/
 /datasets/
 maxim/ckpts/
 maxim/images/
+checkpoints/
+best_checkpoint/
 
 # Carpetas de logs antiguas de la raíz (los logs vigentes están en runs_logs/)
 /moe_outputs/
