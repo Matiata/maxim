@@ -93,6 +93,49 @@ Esta sección resume lo ocurrido desde el 8 de octubre y **prevalece sobre las s
 - **Criterio.** El mismo de la opción 1: el mejor `S2_d32_l12` a menos de 0,05 dB del profesor en macro de validación y ninguna tarea por debajo de −0,10 dB. La última celda compara con las corridas v1 de S1/S2_d32 y S1/S2_d32_l012.
 - **Orden.** `S2_d32_l12` v1 y después `S1_d32_l12` v1, que se corre siempre para medir S2 − S1 con dos niveles sustituidos.
 
+**Compresión intermedia, resultados del 30/10 al 3/11: no favorable por derain, con dos semillas.** Se corrieron `S2_d32_l12` v1 y v2 y `S1_d32_l12` v1. Resultados en `runs_logs/compresion_adaptacion/S{1,2}_d32_l12_v1/` y `S2_d32_l12_v2/`. Las tres usan el protocolo de su réplica: hash comparable 81c1bc48… en v1, igual a S1/S2_d32 v1, y 47d56489… en v2, igual a S1/S2_d32 v2. La primera ejecución de v1 se colgó al cargar la validación porque se cayó el montaje del Drive (`Transport endpoint is not connected`); no llegó a crear la carpeta y se volvió a correr desde cero en una máquina nueva. Validación, mejor época, Δ frente al profesor S0_sel:
+
+| Variante | Params vs B0 | GFLOP vs B0 | Época | Macro | Δ macro | Ponderado | deblur | dehaze | denoise | derain | enhance |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| S2_d32 v1 | −13,5 % | −7,3 % | 4 | 32,133 | +0,070 | 27,481 | +0,13 | +0,20 | +0,01 | −0,01 | +0,03 |
+| S2_d32 v2 | −13,5 % | −7,3 % | 5 | 32,104 | +0,041 | 27,454 | +0,07 | +0,13 | −0,00 | −0,03 | +0,03 |
+| S1_d32_l12 v1 | −19,4 % | −15,6 % | 5 | 31,738 | −0,326 | 27,282 | +0,04 | −0,91 | −0,19 | −0,56 | −0,02 |
+| S2_d32_l12 v1 | −16,4 % | −15,6 % | 4 | 32,144 | +0,080 | 27,501 | +0,24 | +0,34 | +0,06 | −0,30 | +0,06 |
+| S2_d32_l12 v2 | −16,4 % | −15,6 % | 5 | 32,122 | +0,059 | 27,466 | +0,15 | +0,33 | +0,11 | −0,33 | +0,04 |
+
+- **S2_d32_l12 empata con S2_d32 en los agregados y pierde en derain, en las dos semillas.** Frente a S2_d32 de la misma réplica da +0,010 y +0,018 dB macro, +0,020 y +0,013 ponderado, y derain −0,29 y −0,30. Deblur, dehaze y denoise suben en las dos. La diferencia macro está dentro de la variación entre semillas: S2_d32 se movió 0,03 dB entre v1 y v2.
+- **No cumple el criterio sólo por derain.** El macro está bien por encima del umbral, pero derain queda 0,30 y 0,33 dB por debajo del profesor contra un límite de 0,10. No se relaja el umbral después de ver el resultado. Para la tesis, S2_d32_l12 es un punto de compromiso confirmado: el doble de reducción de FLOPs que S2_d32 con la misma calidad agregada y unos −0,3 dB en derain. S2_d32 sigue siendo la variante que cumple "ninguna tarea pierde".
+- **Más épocas no lo arreglan.** Derain se estancó en las épocas 4 y 5 en ambas semillas: 26,97 y 26,96 en v1, 26,90 y 26,94 en v2.
+- **Cada nivel afecta a una tarea distinta.** Sustituir el nivel 1 cuesta derain: −0,01 con sólo el nivel 2, −0,30 con los niveles 1 y 2 y −0,42 con los tres. Sustituir el nivel 0 es lo que hunde dehaze: +0,34 con los niveles 1 y 2, −1,82 con los tres.
+- **S2 − S1 crece con los niveles sustituidos, réplica v1:** +0,11 dB macro con el nivel 2, +0,41 con los niveles 1 y 2 y +0,75 con los tres. Con los niveles 1 y 2 es positivo en todas las tareas: dehaze +1,24, derain +0,26, denoise +0,26, deblur +0,20, enhance +0,08.
+- **GFLOP.** Con la CPU como dispositivo por defecto, la celda de comparación ya los calcula en Colab: 216,4 B0, 200,6 nivel 2, 182,6 niveles 1 y 2, 166,0 los tres niveles.
+
+**Validación con intervalos, notebook del 3/11 (misma rama).** `notebooks/evaluacion/validacion_compresion_niveles.ipynb` extiende `validacion_compresion.ipynb`, que queda sin cambios porque reproduce los resultados de `compresion_validacion_semillas`. Evalúa B0, S0_sel, S1/S2_d32 v1 y v2, S2_d32_l12 v1 y v2, S1_d32_l12 v1 y S1/S2_d32_l012 v1. Escribe en `ckpts/compresion_validacion_niveles/`.
+- **Análisis principal.** `S2_d32_l12 − S0_sel` y `S2_d32_l12 − S2_d32` promediados entre réplicas, por tarea, con bootstrap pareado. Da el intervalo de la pérdida en derain y del empate en los agregados.
+- **Además.** Repite las comparaciones de la validación de semillas, la tabla de S2 − S1 según los niveles sustituidos y el criterio de la opción 1 para cada corrida. Calcula los GFLOP en el propio notebook con el mismo método que las adaptaciones, en vez de leer el JSON del 19/10, que no tiene las variantes nuevas.
+- **Verificaciones.** Todas las adaptaciones comparten el protocolo salvo las semillas. La definición de cada variante coincide con la guardada en su corrida. Cada adaptación reproduce, con tolerancia de 0,01 dB, el PSNR macro con que se eligió su época. B0 y S0_sel reproducen sus valores registrados.
+- **Las celdas de caché, restauración, evaluación y bootstrap son idénticas a las del test final**, como en la validación anterior. No usa test.
+
+**Validación con intervalos, resultados del 3/11: la pérdida en derain de S2_d32_l12 es robusta.** Resultados en `runs_logs/compresion_validacion_niveles/`, protocolo f7ed4350…, 2303 pares de val, estado `complete`. Todas las verificaciones dan verdadero; cada adaptación reproduce su macro de selección con diferencias menores a 0,0001 dB y B0/S0_sel reproducen sus valores registrados. Diferencias promediadas entre las réplicas v1 y v2, bootstrap pareado estratificado por tarea, IC 95 %:
+
+| Tarea | S2_d32_l12 − S0_sel | IC 95 % | S2_d32_l12 − S2_d32 | IC 95 % |
+|---|---:|---|---:|---|
+| deblur | +0,194 | [+0,111, +0,291] | +0,092 | [+0,048, +0,150] |
+| dehaze | +0,332 | [+0,107, +0,640] | +0,165 | [+0,033, +0,346] |
+| denoise | +0,087 | [+0,065, +0,110] | +0,084 | [+0,064, +0,105] |
+| derain | −0,317 | [−0,372, −0,255] | −0,295 | [−0,342, −0,237] |
+| enhance | +0,050 | [−0,011, +0,115] | +0,024 | [−0,024, +0,080] |
+| **Macro** | **+0,069** | [+0,018, +0,136] | **+0,014** | [−0,017, +0,055] |
+| Ponderado | +0,063 | [+0,026, +0,105] | +0,016 | [−0,008, +0,043] |
+
+- **Derain queda fuera del criterio con todo el intervalo.** El extremo superior, −0,255 dB, está lejos del límite de −0,10. No es ruido de muestreo ni de semilla: las dos réplicas dan −0,30 y −0,33 con intervalos que no se tocan con el límite. El criterio pre-registrado no se cumple y no se relaja.
+- **Frente a S2_d32 es un empate en los agregados con un intercambio entre tareas.** El macro y el ponderado incluyen el cero. Deblur, dehaze y denoise mejoran con intervalos que excluyen el cero; derain empeora con un intervalo que también lo excluye; enhance empata.
+- **Frente al profesor, S2_d32_l12 mejora el macro y el ponderado**: +0,069 y +0,063 dB, con intervalos por encima del cero. Mejora cuatro tareas y pierde derain.
+- **El resto confirma lo anterior.** S2_d32 − S0_sel +0,055 [+0,024, +0,092]; S2_d32 − S1_d32 +0,115 [+0,086, +0,154]; S1_d32 − S0_sel −0,060 [−0,075, −0,044]. S2 − S1 con los niveles 1 y 2, réplica v1: +0,406 [+0,335, +0,500]; con los tres niveles: +0,747 [+0,649, +0,845]. Sólo S2_d32 v1 y v2 cumplen el criterio.
+- **Conclusión para la tesis.** S2_d32 sigue siendo la variante principal: −13,5 % de parámetros y −7,3 % de GFLOP, sin que ninguna tarea pierda más de 0,10 dB. S2_d32_l12 es un punto de compromiso documentado con intervalos: −16,4 % de parámetros y −15,6 % de GFLOP, la misma calidad agregada que S2_d32 y −0,32 dB en derain. Los niveles 0, 1 y 2 no sirven en ninguna de las dos formas.
+- **Pendiente: medir la latencia de l12.** Con S2_d32, −7,3 % de GFLOP dio sólo −1,1 % de latencia en L4 a 256 (41,11 frente a 41,58 ms). Antes de presentar l12 como ahorro de tiempo hay que medirla en el benchmark v2; por ahora el ahorro demostrado es de FLOPs y parámetros.
+
+
 ## 1. Decisión y objetivo
 
 En la reunión con los profesores se decidió orientar la siguiente fase a reducir el costo computacional conservando calidad. La evidencia actual no permite asegurar una mejora robusta de calidad frente al baseline. Esto no equivale a haber realizado una prueba formal de significancia.

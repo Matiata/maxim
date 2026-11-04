@@ -14,9 +14,11 @@ ADAPTATION_L012 = (REPO_ROOT / "notebooks" / "entrenamiento"
 ADAPTATION_L12 = (REPO_ROOT / "notebooks" / "entrenamiento"
                   / "adaptacion_compresion_niveles_1_2.ipynb")
 VALIDATION = REPO_ROOT / "notebooks" / "evaluacion" / "validacion_compresion.ipynb"
+VALIDATION_LEVELS = (REPO_ROOT / "notebooks" / "evaluacion"
+                     / "validacion_compresion_niveles.ipynb")
 TEST = REPO_ROOT / "notebooks" / "evaluacion" / "test_final_compresion.ipynb"
 ALL = (ADAPTATION, ADAPTATION_SEED2, ADAPTATION_L012, ADAPTATION_L12,
-       VALIDATION, TEST)
+       VALIDATION, VALIDATION_LEVELS, TEST)
 
 
 def code_source(path):
@@ -81,6 +83,24 @@ class CompressionNotebooksTest(unittest.TestCase):
         ):
             self.assertIn(marker, source)
         self.assertNotIn("save_checkpoint", source)
+
+    def test_levels_validation_protocol(self):
+        _, source = code_source(VALIDATION_LEVELS)
+        for marker in (
+            'SPLIT = "val"', 'REPLICAS = ["v1", "v2"]',
+            '("l12", (1, 2)), ("l012", (0, 1, 2))', "VARIANTS.update(LEVEL_VARIANTS)",
+            '"v2": ["S1_d32", "S2_d32", "S2_d32_l12"]',
+            '"S2_d32_l12 - S0_sel": [(f"S2_d32_l12_{r}", "S0_sel")',
+            '"S2_d32_l12 - S2_d32": [(f"S2_d32_l12_{r}", f"S2_d32_{r}")',
+            "same_protocol_except_seeds_across_replicas", "variant_spec_matches",
+            "_reproduces_selection_db", "SELECTION_TOLERANCE_DB = 0.01",
+            "CRITERION_MACRO_DB = 0.05", "CRITERION_TASK_DB = 0.10",
+            'with jax.default_device(jax.devices("cpu")[0]):',
+            "REQUIRE_COMPLETE_ADAPTATION = True", "compresion_validacion_niveles",
+        ):
+            self.assertIn(marker, source)
+        self.assertNotIn("save_checkpoint", source)
+        self.assertNotIn("compresion_validacion_semillas", source)
 
     def test_replica_seeds_keep_original_protocol(self):
         # v1 must keep the seeds of the runs already completed (protocol hash).
@@ -165,16 +185,17 @@ class CompressionNotebooksTest(unittest.TestCase):
         self.assertEqual(len(set(cells)), 1)
 
     def test_validation_and_test_share_evaluation_code(self):
-        val, _ = code_source(VALIDATION)
         test, _ = code_source(TEST)
         shared = ("# Validación en memoria", "# 6. Evaluación por modelo",
                   "# 7. Diferencias pareadas", "# Restauración estricta")
-        for prefix in shared:
-            a = next("".join(c["source"]) for c in val["cells"]
-                     if "".join(c["source"]).startswith(prefix))
-            b = next("".join(c["source"]) for c in test["cells"]
-                     if "".join(c["source"]).startswith(prefix))
-            self.assertEqual(a, b, prefix)
+        for path in (VALIDATION, VALIDATION_LEVELS):
+            val, _ = code_source(path)
+            for prefix in shared:
+                a = next("".join(c["source"]) for c in val["cells"]
+                         if "".join(c["source"]).startswith(prefix))
+                b = next("".join(c["source"]) for c in test["cells"]
+                         if "".join(c["source"]).startswith(prefix))
+                self.assertEqual(a, b, f"{path.name}: {prefix}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,120 @@
+
+======================================================================
+Sesión 2026-10-30 18:02:20 | S2_d32_l12 | GPU NVIDIA L4 | desde época 0
+Fase modulos_nuevos (new_only): entrenables 527,360 | congelados 11,320,801
+época 1 paso 1: auxiliary_l1=0.0339, distill_features=1.5573, distill_output=0.0107, final_l1=0.0224, grad_norm=0.1428, loss=0.2227, reconstruction=0.0563
+época 1 paso 100: auxiliary_l1=0.0700, distill_features=1.0342, distill_output=0.0447, final_l1=0.0561, grad_norm=0.1562, loss=0.2742, reconstruction=0.1261
+época 1 paso 200: auxiliary_l1=0.0293, distill_features=0.9852, distill_output=0.0122, final_l1=0.0196, grad_norm=0.1291, loss=0.1595, reconstruction=0.0489
+época 1 paso 300: auxiliary_l1=0.0359, distill_features=0.7529, distill_output=0.0067, final_l1=0.0295, grad_norm=0.1415, loss=0.1475, reconstruction=0.0654
+época 1 paso 400: auxiliary_l1=0.0597, distill_features=0.7704, distill_output=0.0903, final_l1=0.0559, grad_norm=1.1748, loss=0.2830, reconstruction=0.1156
+época 1 paso 500: auxiliary_l1=0.0743, distill_features=0.4663, distill_output=0.0101, final_l1=0.0666, grad_norm=0.3901, loss=0.1976, reconstruction=0.1409
+época 1 paso 600: auxiliary_l1=0.0773, distill_features=0.4324, distill_output=0.0413, final_l1=0.0636, grad_norm=0.3911, loss=0.2254, reconstruction=0.1409
+época 1 paso 700: auxiliary_l1=0.0593, distill_features=0.3138, distill_output=0.0148, final_l1=0.0467, grad_norm=0.1270, loss=0.1521, reconstruction=0.1059
+época 1 paso 800: auxiliary_l1=0.0094, distill_features=0.3051, distill_output=0.0023, final_l1=0.0041, grad_norm=0.0712, loss=0.0463, reconstruction=0.0135
+época 1 paso 900: auxiliary_l1=0.0225, distill_features=0.2450, distill_output=0.0087, final_l1=0.0177, grad_norm=0.0664, loss=0.0733, reconstruction=0.0402
+época 1 paso 1000: auxiliary_l1=0.0137, distill_features=0.1365, distill_output=0.0044, final_l1=0.0102, grad_norm=0.0453, loss=0.0420, reconstruction=0.0239
+época 1 paso 1100: auxiliary_l1=0.0759, distill_features=0.3779, distill_output=0.0558, final_l1=0.0780, grad_norm=0.2956, loss=0.2475, reconstruction=0.1539
+época 1 paso 1200: auxiliary_l1=0.0528, distill_features=0.2210, distill_output=0.0153, final_l1=0.0473, grad_norm=0.1677, loss=0.1374, reconstruction=0.1000
+época 1 paso 1300: auxiliary_l1=0.0609, distill_features=0.2410, distill_output=0.0227, final_l1=0.0524, grad_norm=0.1214, loss=0.1602, reconstruction=0.1134
+época 1 paso 1400: auxiliary_l1=0.0325, distill_features=0.2414, distill_output=0.0131, final_l1=0.0254, grad_norm=0.0531, loss=0.0951, reconstruction=0.0578
+época 1 paso 1500: auxiliary_l1=0.0723, distill_features=0.1918, distill_output=0.0146, final_l1=0.0606, grad_norm=0.2569, loss=0.1667, reconstruction=0.1329
+época 1 paso 1600: auxiliary_l1=0.0638, distill_features=0.2541, distill_output=0.0299, final_l1=0.0481, grad_norm=0.2837, loss=0.1673, reconstruction=0.1119
+época 1 paso 1700: auxiliary_l1=0.0267, distill_features=0.2060, distill_output=0.0101, final_l1=0.0207, grad_norm=0.0582, loss=0.0782, reconstruction=0.0474
+época 1 paso 1800: auxiliary_l1=0.0544, distill_features=0.2901, distill_output=0.0259, final_l1=0.0424, grad_norm=0.1968, loss=0.1517, reconstruction=0.0968
+época 1 paso 1900: auxiliary_l1=0.0368, distill_features=0.1891, distill_output=0.0073, final_l1=0.0341, grad_norm=0.0654, loss=0.0970, reconstruction=0.0709
+época 1 paso 2000: auxiliary_l1=0.1190, distill_features=0.1374, distill_output=0.0058, final_l1=0.1031, grad_norm=0.1642, loss=0.2416, reconstruction=0.2221
+[val época 1] macro 31.6166 dB | ponderado 27.2056 dB | SSIM macro 0.8536 | 122 s
+Nuevo mejor: 31.6166 dB en la época 1
+época 2 paso 1: auxiliary_l1=0.0306, distill_features=0.2126, distill_output=0.0151, final_l1=0.0215, grad_norm=0.1606, loss=0.0884, reconstruction=0.0521
+época 2 paso 100: auxiliary_l1=0.0959, distill_features=0.1540, distill_output=0.0099, final_l1=0.0899, grad_norm=0.0987, loss=0.2110, reconstruction=0.1858
+época 2 paso 200: auxiliary_l1=0.0096, distill_features=0.0738, distill_output=0.0027, final_l1=0.0073, grad_norm=0.0263, loss=0.0269, reconstruction=0.0169
+época 2 paso 300: auxiliary_l1=0.0126, distill_features=0.1035, distill_output=0.0038, final_l1=0.0101, grad_norm=0.0395, loss=0.0369, reconstruction=0.0228
+época 2 paso 400: auxiliary_l1=0.0318, distill_features=0.1309, distill_output=0.0094, final_l1=0.0283, grad_norm=0.0805, loss=0.0825, reconstruction=0.0600
+época 2 paso 500: auxiliary_l1=0.0639, distill_features=0.1653, distill_output=0.0109, final_l1=0.0569, grad_norm=0.0558, loss=0.1482, reconstruction=0.1208
+época 2 paso 600: auxiliary_l1=0.0547, distill_features=0.1785, distill_output=0.0071, final_l1=0.0568, grad_norm=0.1369, loss=0.1365, reconstruction=0.1116
+época 2 paso 700: auxiliary_l1=0.0054, distill_features=0.0905, distill_output=0.0012, final_l1=0.0029, grad_norm=0.0276, loss=0.0185, reconstruction=0.0083
+época 2 paso 800: auxiliary_l1=0.0282, distill_features=0.1613, distill_output=0.0108, final_l1=0.0235, grad_norm=0.0605, loss=0.0787, reconstruction=0.0517
+época 2 paso 900: auxiliary_l1=0.0648, distill_features=0.1205, distill_output=0.0052, final_l1=0.0592, grad_norm=0.1286, loss=0.1412, reconstruction=0.1240
+época 2 paso 1000: auxiliary_l1=0.0231, distill_features=0.1360, distill_output=0.0031, final_l1=0.0192, grad_norm=0.0500, loss=0.0589, reconstruction=0.0423
+época 2 paso 1100: auxiliary_l1=0.0317, distill_features=0.1279, distill_output=0.0053, final_l1=0.0269, grad_norm=0.0701, loss=0.0767, reconstruction=0.0586
+época 2 paso 1200: auxiliary_l1=0.0229, distill_features=0.1499, distill_output=0.0077, final_l1=0.0205, grad_norm=0.0429, loss=0.0661, reconstruction=0.0434
+época 2 paso 1300: auxiliary_l1=0.0517, distill_features=0.2158, distill_output=0.0220, final_l1=0.0458, grad_norm=0.1508, loss=0.1410, reconstruction=0.0974
+época 2 paso 1400: auxiliary_l1=0.0510, distill_features=0.1290, distill_output=0.0076, final_l1=0.0441, grad_norm=0.0478, loss=0.1155, reconstruction=0.0951
+época 2 paso 1500: auxiliary_l1=0.0278, distill_features=0.2342, distill_output=0.0160, final_l1=0.0403, grad_norm=0.0589, loss=0.1075, reconstruction=0.0680
+época 2 paso 1600: auxiliary_l1=0.0314, distill_features=0.1310, distill_output=0.0060, final_l1=0.0289, grad_norm=0.1797, loss=0.0795, reconstruction=0.0604
+época 2 paso 1700: auxiliary_l1=0.0404, distill_features=0.1095, distill_output=0.0033, final_l1=0.0369, grad_norm=0.0417, loss=0.0916, reconstruction=0.0774
+época 2 paso 1800: auxiliary_l1=0.0284, distill_features=0.1211, distill_output=0.0101, final_l1=0.0221, grad_norm=0.1204, loss=0.0727, reconstruction=0.0505
+época 2 paso 1900: auxiliary_l1=0.0131, distill_features=0.1218, distill_output=0.0031, final_l1=0.0089, grad_norm=0.0365, loss=0.0372, reconstruction=0.0220
+época 2 paso 2000: auxiliary_l1=0.0362, distill_features=0.1221, distill_output=0.0036, final_l1=0.0321, grad_norm=0.0312, loss=0.0841, reconstruction=0.0683
+[val época 2] macro 31.8051 dB | ponderado 27.3683 dB | SSIM macro 0.8556 | 103 s
+Nuevo mejor: 31.8051 dB en la época 2
+época 3 paso 1: auxiliary_l1=0.0871, distill_features=0.1853, distill_output=0.0101, final_l1=0.0808, grad_norm=0.1270, loss=0.1965, reconstruction=0.1680
+época 3 paso 100: auxiliary_l1=0.0250, distill_features=0.1090, distill_output=0.0056, final_l1=0.0252, grad_norm=0.0812, loss=0.0667, reconstruction=0.0503
+época 3 paso 200: auxiliary_l1=0.0242, distill_features=0.1360, distill_output=0.0079, final_l1=0.0199, grad_norm=0.0380, loss=0.0656, reconstruction=0.0441
+época 3 paso 300: auxiliary_l1=0.0514, distill_features=0.1695, distill_output=0.0267, final_l1=0.0370, grad_norm=0.5659, loss=0.1320, reconstruction=0.0884
+época 3 paso 400: auxiliary_l1=0.0294, distill_features=0.1359, distill_output=0.0064, final_l1=0.0235, grad_norm=0.0930, loss=0.0729, reconstruction=0.0529
+época 3 paso 500: auxiliary_l1=0.0271, distill_features=0.1693, distill_output=0.0095, final_l1=0.0202, grad_norm=0.0530, loss=0.0738, reconstruction=0.0473
+época 3 paso 600: auxiliary_l1=0.0286, distill_features=0.1724, distill_output=0.0095, final_l1=0.0254, grad_norm=0.0594, loss=0.0808, reconstruction=0.0540
+época 3 paso 700: auxiliary_l1=0.0826, distill_features=0.2430, distill_output=0.0307, final_l1=0.0804, grad_norm=0.5770, loss=0.2180, reconstruction=0.1630
+época 3 paso 800: auxiliary_l1=0.0494, distill_features=0.1724, distill_output=0.0113, final_l1=0.0448, grad_norm=0.0422, loss=0.1227, reconstruction=0.0942
+época 3 paso 900: auxiliary_l1=0.0832, distill_features=0.1532, distill_output=0.0065, final_l1=0.0875, grad_norm=0.1129, loss=0.1925, reconstruction=0.1707
+época 3 paso 1000: auxiliary_l1=0.0171, distill_features=0.1239, distill_output=0.0049, final_l1=0.0148, grad_norm=0.0705, loss=0.0492, reconstruction=0.0319
+época 3 paso 1100: auxiliary_l1=0.0376, distill_features=0.0914, distill_output=0.0032, final_l1=0.0342, grad_norm=0.0189, loss=0.0841, reconstruction=0.0718
+época 3 paso 1200: auxiliary_l1=0.0128, distill_features=0.0817, distill_output=0.0015, final_l1=0.0104, grad_norm=0.0243, loss=0.0329, reconstruction=0.0232
+época 3 paso 1300: auxiliary_l1=0.0185, distill_features=0.1289, distill_output=0.0050, final_l1=0.0145, grad_norm=0.0290, loss=0.0508, reconstruction=0.0330
+época 3 paso 1400: auxiliary_l1=0.0132, distill_features=0.0838, distill_output=0.0014, final_l1=0.0105, grad_norm=0.0150, loss=0.0335, reconstruction=0.0237
+época 3 paso 1500: auxiliary_l1=0.0198, distill_features=0.1580, distill_output=0.0071, final_l1=0.0157, grad_norm=0.0351, loss=0.0584, reconstruction=0.0355
+época 3 paso 1600: auxiliary_l1=0.0373, distill_features=0.1184, distill_output=0.0097, final_l1=0.0322, grad_norm=0.1553, loss=0.0910, reconstruction=0.0695
+época 3 paso 1700: auxiliary_l1=0.0712, distill_features=0.1247, distill_output=0.0051, final_l1=0.0708, grad_norm=0.0605, loss=0.1597, reconstruction=0.1421
+época 3 paso 1800: auxiliary_l1=0.0380, distill_features=0.1473, distill_output=0.0104, final_l1=0.0249, grad_norm=0.1153, loss=0.0880, reconstruction=0.0629
+época 3 paso 1900: auxiliary_l1=0.0650, distill_features=0.1347, distill_output=0.0076, final_l1=0.0597, grad_norm=0.0753, loss=0.1458, reconstruction=0.1248
+época 3 paso 2000: auxiliary_l1=0.0142, distill_features=0.1117, distill_output=0.0032, final_l1=0.0095, grad_norm=0.0172, loss=0.0381, reconstruction=0.0238
+[val época 3] macro 32.0218 dB | ponderado 27.4417 dB | SSIM macro 0.8572 | 103 s
+Nuevo mejor: 32.0218 dB en la época 3
+época 4 paso 1: auxiliary_l1=0.0335, distill_features=0.1131, distill_output=0.0090, final_l1=0.0272, grad_norm=0.1199, loss=0.0810, reconstruction=0.0607
+época 4 paso 100: auxiliary_l1=0.0204, distill_features=0.1658, distill_output=0.0091, final_l1=0.0152, grad_norm=0.0622, loss=0.0613, reconstruction=0.0356
+época 4 paso 200: auxiliary_l1=0.0183, distill_features=0.0782, distill_output=0.0037, final_l1=0.0159, grad_norm=0.0244, loss=0.0457, reconstruction=0.0342
+época 4 paso 300: auxiliary_l1=0.0610, distill_features=0.1078, distill_output=0.0067, final_l1=0.0533, grad_norm=0.0638, loss=0.1317, reconstruction=0.1143
+época 4 paso 400: auxiliary_l1=0.0051, distill_features=0.0713, distill_output=0.0011, final_l1=0.0026, grad_norm=0.0118, loss=0.0159, reconstruction=0.0077
+época 4 paso 500: auxiliary_l1=0.0454, distill_features=0.0977, distill_output=0.0060, final_l1=0.0487, grad_norm=0.0965, loss=0.1099, reconstruction=0.0941
+época 4 paso 600: auxiliary_l1=0.0510, distill_features=0.1804, distill_output=0.0145, final_l1=0.0473, grad_norm=0.3121, loss=0.1308, reconstruction=0.0982
+época 4 paso 700: auxiliary_l1=0.0327, distill_features=0.1894, distill_output=0.0107, final_l1=0.0245, grad_norm=0.1490, loss=0.0869, reconstruction=0.0573
+época 4 paso 800: auxiliary_l1=0.0489, distill_features=0.1283, distill_output=0.0060, final_l1=0.0437, grad_norm=0.0549, loss=0.1114, reconstruction=0.0925
+época 4 paso 900: auxiliary_l1=0.0206, distill_features=0.1476, distill_output=0.0056, final_l1=0.0149, grad_norm=0.0361, loss=0.0558, reconstruction=0.0355
+época 4 paso 1000: auxiliary_l1=0.0266, distill_features=0.1097, distill_output=0.0091, final_l1=0.0214, grad_norm=0.2751, loss=0.0681, reconstruction=0.0480
+época 4 paso 1100: auxiliary_l1=0.0469, distill_features=0.1642, distill_output=0.0146, final_l1=0.0370, grad_norm=0.0770, loss=0.1150, reconstruction=0.0840
+época 4 paso 1200: auxiliary_l1=0.0174, distill_features=0.0927, distill_output=0.0036, final_l1=0.0137, grad_norm=0.0178, loss=0.0439, reconstruction=0.0311
+época 4 paso 1300: auxiliary_l1=0.0112, distill_features=0.1082, distill_output=0.0026, final_l1=0.0058, grad_norm=0.0259, loss=0.0304, reconstruction=0.0170
+época 4 paso 1400: auxiliary_l1=0.0405, distill_features=0.0696, distill_output=0.0027, final_l1=0.0392, grad_norm=0.0247, loss=0.0893, reconstruction=0.0797
+época 4 paso 1500: auxiliary_l1=0.0994, distill_features=0.1399, distill_output=0.0154, final_l1=0.0901, grad_norm=0.2120, loss=0.2188, reconstruction=0.1895
+época 4 paso 1600: auxiliary_l1=0.0283, distill_features=0.1455, distill_output=0.0084, final_l1=0.0235, grad_norm=0.0773, loss=0.0748, reconstruction=0.0518
+época 4 paso 1700: auxiliary_l1=0.0797, distill_features=0.2422, distill_output=0.0105, final_l1=0.0277, grad_norm=0.0894, loss=0.1422, reconstruction=0.1074
+época 4 paso 1800: auxiliary_l1=0.0172, distill_features=0.1160, distill_output=0.0040, final_l1=0.0128, grad_norm=0.0282, loss=0.0456, reconstruction=0.0300
+época 4 paso 1900: auxiliary_l1=0.0470, distill_features=0.1557, distill_output=0.0098, final_l1=0.0414, grad_norm=0.0714, loss=0.1138, reconstruction=0.0884
+época 4 paso 2000: auxiliary_l1=0.0063, distill_features=0.0895, distill_output=0.0012, final_l1=0.0036, grad_norm=0.0142, loss=0.0201, reconstruction=0.0099
+[val época 4] macro 32.1435 dB | ponderado 27.5009 dB | SSIM macro 0.8580 | 102 s
+Nuevo mejor: 32.1435 dB en la época 4
+época 5 paso 1: auxiliary_l1=0.0099, distill_features=0.0686, distill_output=0.0026, final_l1=0.0080, grad_norm=0.0107, loss=0.0273, reconstruction=0.0179
+época 5 paso 100: auxiliary_l1=0.0217, distill_features=0.1482, distill_output=0.0228, final_l1=0.0194, grad_norm=0.2845, loss=0.0788, reconstruction=0.0411
+época 5 paso 200: auxiliary_l1=0.0246, distill_features=0.0802, distill_output=0.0028, final_l1=0.0224, grad_norm=0.0249, loss=0.0579, reconstruction=0.0470
+época 5 paso 300: auxiliary_l1=0.0666, distill_features=0.1558, distill_output=0.0091, final_l1=0.0636, grad_norm=0.0945, loss=0.1548, reconstruction=0.1301
+época 5 paso 400: auxiliary_l1=0.0220, distill_features=0.1215, distill_output=0.0067, final_l1=0.0165, grad_norm=0.0619, loss=0.0573, reconstruction=0.0385
+época 5 paso 500: auxiliary_l1=0.0171, distill_features=0.0834, distill_output=0.0029, final_l1=0.0156, grad_norm=0.0166, loss=0.0440, reconstruction=0.0327
+época 5 paso 600: auxiliary_l1=0.0440, distill_features=0.1187, distill_output=0.0041, final_l1=0.0398, grad_norm=0.0491, loss=0.0998, reconstruction=0.0838
+época 5 paso 700: auxiliary_l1=0.0198, distill_features=0.0929, distill_output=0.0058, final_l1=0.0147, grad_norm=0.0470, loss=0.0495, reconstruction=0.0345
+época 5 paso 800: auxiliary_l1=0.0319, distill_features=0.1551, distill_output=0.0088, final_l1=0.0263, grad_norm=0.0335, loss=0.0826, reconstruction=0.0582
+época 5 paso 900: auxiliary_l1=0.0372, distill_features=0.0916, distill_output=0.0049, final_l1=0.0344, grad_norm=0.0457, loss=0.0856, reconstruction=0.0716
+época 5 paso 1000: auxiliary_l1=0.0402, distill_features=0.0815, distill_output=0.0042, final_l1=0.0413, grad_norm=0.0403, loss=0.0939, reconstruction=0.0815
+época 5 paso 1100: auxiliary_l1=0.0374, distill_features=0.0740, distill_output=0.0025, final_l1=0.0370, grad_norm=0.0294, loss=0.0843, reconstruction=0.0744
+época 5 paso 1200: auxiliary_l1=0.0350, distill_features=0.1111, distill_output=0.0061, final_l1=0.0252, grad_norm=0.0801, loss=0.0774, reconstruction=0.0602
+época 5 paso 1300: auxiliary_l1=0.0080, distill_features=0.0719, distill_output=0.0018, final_l1=0.0049, grad_norm=0.0125, loss=0.0219, reconstruction=0.0129
+época 5 paso 1400: auxiliary_l1=0.0261, distill_features=0.0883, distill_output=0.0041, final_l1=0.0239, grad_norm=0.0367, loss=0.0630, reconstruction=0.0500
+época 5 paso 1500: auxiliary_l1=0.0551, distill_features=0.1715, distill_output=0.0169, final_l1=0.0475, grad_norm=0.0924, loss=0.1367, reconstruction=0.1026
+época 5 paso 1600: auxiliary_l1=0.0646, distill_features=0.1231, distill_output=0.0024, final_l1=0.0635, grad_norm=0.0254, loss=0.1428, reconstruction=0.1281
+época 5 paso 1700: auxiliary_l1=0.0250, distill_features=0.1276, distill_output=0.0065, final_l1=0.0167, grad_norm=0.0227, loss=0.0609, reconstruction=0.0416
+época 5 paso 1800: auxiliary_l1=0.0229, distill_features=0.1681, distill_output=0.0088, final_l1=0.0181, grad_norm=0.0980, loss=0.0666, reconstruction=0.0410
+época 5 paso 1900: auxiliary_l1=0.0286, distill_features=0.0956, distill_output=0.0035, final_l1=0.0313, grad_norm=0.0829, loss=0.0729, reconstruction=0.0599
+época 5 paso 2000: auxiliary_l1=0.0319, distill_features=0.0799, distill_output=0.0024, final_l1=0.0306, grad_norm=0.0136, loss=0.0728, reconstruction=0.0625
+[val época 5] macro 32.1234 dB | ponderado 27.4805 dB | SSIM macro 0.8575 | 103 s
+Verificado: los parámetros congelados no cambiaron.
+Fin de sesión | épocas completas 5/5 | mejor macro 32.1435 dB
