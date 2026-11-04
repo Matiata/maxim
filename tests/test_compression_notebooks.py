@@ -17,8 +17,14 @@ VALIDATION = REPO_ROOT / "notebooks" / "evaluacion" / "validacion_compresion.ipy
 VALIDATION_LEVELS = (REPO_ROOT / "notebooks" / "evaluacion"
                      / "validacion_compresion_niveles.ipynb")
 TEST = REPO_ROOT / "notebooks" / "evaluacion" / "test_final_compresion.ipynb"
+TEST_LEVELS = (REPO_ROOT / "notebooks" / "evaluacion"
+               / "test_final_compresion_niveles.ipynb")
+BENCHMARK_V2 = (REPO_ROOT / "notebooks" / "benchmark"
+                / "benchmark_maxim_v2_compresion.ipynb")
+BENCHMARK_LEVELS = (REPO_ROOT / "notebooks" / "benchmark"
+                    / "benchmark_maxim_niveles.ipynb")
 ALL = (ADAPTATION, ADAPTATION_SEED2, ADAPTATION_L012, ADAPTATION_L12,
-       VALIDATION, VALIDATION_LEVELS, TEST)
+       VALIDATION, VALIDATION_LEVELS, TEST, TEST_LEVELS)
 
 
 def code_source(path):
@@ -184,11 +190,76 @@ class CompressionNotebooksTest(unittest.TestCase):
                 cells[-1])
         self.assertEqual(len(set(cells)), 1)
 
+    def test_levels_test_notebook(self):
+        _, source = code_source(TEST_LEVELS)
+        for marker in (
+            'SPLIT = "test"', "CONFIRM_TEST_RUN = False",
+            "Poner CONFIRM_TEST_RUN = True", '"decision": (',
+            '"B0": 28.12741289151419, "S0_sel": 28.136597748472962',
+            '"S1_d32_v2": 28.08089575271877, "S2_d32_v2": 28.153763404056907',
+            '"S2_d32_l12 - S0_sel": [(f"S2_d32_l12_{r}", "S0_sel")',
+            '"S2_d32_l12 - S2_d32": [(f"S2_d32_l12_{r}", f"S2_d32_{r}")',
+            "variant_spec_matches", "REQUIRE_COMPLETE_ADAPTATION = True",
+            'CHECKPOINT_ROOT / "compresion_test_niveles"',
+            'with jax.default_device(jax.devices("cpu")[0]):',
+        ):
+            self.assertIn(marker, source)
+        self.assertNotIn("save_checkpoint", source)
+        self.assertNotIn("_reproduces_selection_db", source)
+        self.assertNotIn('CHECKPOINT_ROOT / "compresion_test_final"', source)
+
+    def test_levels_test_only_changes_split_and_report(self):
+        # Mismos modelos y comparaciones que la validación de niveles.
+        first, _ = code_source(VALIDATION_LEVELS)
+        second, _ = code_source(TEST_LEVELS)
+        a = ["".join(c["source"]) for c in first["cells"] if c["cell_type"] == "code"]
+        b = ["".join(c["source"]) for c in second["cells"] if c["cell_type"] == "code"]
+        self.assertEqual(len(a), len(b))
+        changed = [x.split("\n")[0] for x, y in zip(a, b) if x != y]
+        self.assertEqual(changed, [
+            "# 3. Configuración",
+            "# 5. Datos en memoria, resultado reanudable y verificación de procedencia",
+            "# 8. Reporte: calidad, diferencias por réplica y promediadas, costo"])
+        models = lambda text: text[text.index("ADAPTED_RUNS = {"):
+                                   text.index("# Criterio de la opción 1")]
+        self.assertEqual(models(a[2]), models(b[2]))
+
+    def test_levels_benchmark_notebook(self):
+        notebook, source = code_source(BENCHMARK_LEVELS)
+        for cell in notebook["cells"]:
+            if cell["cell_type"] == "code":
+                self.assertIsNone(cell.get("execution_count"))
+                self.assertEqual(cell.get("outputs"), [])
+                ast.parse("".join(cell["source"]))
+        match = re.search(r"EXPECTED_SOURCE_SHA256 = (\{.*?\})\n", source, re.S)
+        for relative, digest in json.loads(match.group(1)).items():
+            actual = hashlib.sha256((REPO_ROOT / relative).read_bytes())
+            self.assertEqual(actual.hexdigest(), digest, relative)
+        first, _ = code_source(BENCHMARK_V2)
+        a = ["".join(c["source"]) for c in first["cells"] if c["cell_type"] == "code"]
+        b = ["".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code"]
+        self.assertEqual(len(a), len(b))
+        changed = [x.split("\n")[0] for x, y in zip(a, b) if x != y]
+        self.assertEqual(changed, [
+            "# 3. Configuración visible antes de medir",
+            "# 5. Protocolo y resultado reanudable",
+            "# 10. Compilación, análisis de costo y cronometraje alternado",
+            "# 11. Grupo de inferencia: todas las variantes de una resolución juntas",
+            "# 14. Reporte legible derivado del JSON, sin decisiones"])
+        for marker in (
+            "VARIANTS.update(LEVEL_VARIANTS)", '"S2_d32_l12", "S1_d32_l12"',
+            '("S2_d32_l12", "new_only")', '"B0", "S0_sel",',
+            'CHECKPOINT_ROOT / "benchmark_maxim_niveles"',
+            'with jax.default_device(jax.devices("cpu")[0]):',
+            "WARMUP_EXECUTIONS = 10", "TIMED_EXECUTIONS = 100",
+        ):
+            self.assertIn(marker, source)
+
     def test_validation_and_test_share_evaluation_code(self):
         test, _ = code_source(TEST)
         shared = ("# Validación en memoria", "# 6. Evaluación por modelo",
                   "# 7. Diferencias pareadas", "# Restauración estricta")
-        for path in (VALIDATION, VALIDATION_LEVELS):
+        for path in (VALIDATION, VALIDATION_LEVELS, TEST_LEVELS):
             val, _ = code_source(path)
             for prefix in shared:
                 a = next("".join(c["source"]) for c in val["cells"]

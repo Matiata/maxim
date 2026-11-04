@@ -135,6 +135,16 @@ Esta sección resume lo ocurrido desde el 8 de octubre y **prevalece sobre las s
 - **Conclusión para la tesis.** S2_d32 sigue siendo la variante principal: −13,5 % de parámetros y −7,3 % de GFLOP, sin que ninguna tarea pierda más de 0,10 dB. S2_d32_l12 es un punto de compromiso documentado con intervalos: −16,4 % de parámetros y −15,6 % de GFLOP, la misma calidad agregada que S2_d32 y −0,32 dB en derain. Los niveles 0, 1 y 2 no sirven en ninguna de las dos formas.
 - **Pendiente: medir la latencia de l12.** Con S2_d32, −7,3 % de GFLOP dio sólo −1,1 % de latencia en L4 a 256 (41,11 frente a 41,58 ms). Antes de presentar l12 como ahorro de tiempo hay que medirla en el benchmark v2; por ahora el ahorro demostrado es de FLOPs y parámetros.
 
+**Cierre de los experimentos, registrado el 4/11 antes de correr el test y el benchmark de las versiones por niveles.** No se prueban más variantes en esta fase. La depthwise 5×5, que recuperaría el campo receptivo de 5×5 de las dos convoluciones originales y podría explicar parte de la pérdida en derain, queda como trabajo futuro. **La decisión ya está tomada con validación y ni el test ni el benchmark la cambian:** S2_d32 es la variante principal, S2_d32_l12 se presenta como punto de compromiso entre costo y calidad, y S1_d32_l12, S1_d32_l012 y S2_d32_l012 quedan descartadas.
+
+- **Test.** `notebooks/evaluacion/test_final_compresion_niveles.ipynb`, con salida en `ckpts/compresion_test_niveles/`. Evalúa en test los mismos 11 modelos que la validación de niveles, con las celdas de caché, restauración, evaluación y bootstrap del test final.
+  - Análisis principal: `S2_d32_l12 − S0_sel` y `S2_d32_l12 − S2_d32`, promediados entre réplicas, en PSNR macro, ponderado y por tarea, con bootstrap pareado.
+  - Secundarios: las demás comparaciones de la validación de niveles. La tabla del criterio se incluye sólo como descripción.
+  - Control: B0, S0_sel y S1/S2_d32 v1 y v2 deben reproducir el test final del 28/10 dentro de 0,01 dB. Si lo hacen, los números de S2_d32 frente a S1_d32 de la tesis siguen siendo los del 28/10.
+- **Uso del test.** Es el segundo uso del test en esta fase. Las versiones por niveles se eligieron sólo con validación y sus épocas no cambian. Si en test la pérdida de S2_d32_l12 en derain queda dentro de 0,10 dB, no pasa a ser favorable: se informa como una diferencia entre splits. Después de este notebook no se evalúan más modelos en test.
+- **Latencia.** `notebooks/benchmark/benchmark_maxim_niveles.ipynb`, con salida en `ckpts/benchmark_maxim_niveles/`. Mide en un mismo proceso, con el protocolo del benchmark v2, B0, S0_sel, S1/S2_d32, S1/S2_d32_l12 y S1/S2_d32_l012 a 256 y 512, y el paso de adaptación de S2 en los tres niveles.
+  - B0, S0_sel y S2_d32 se vuelven a medir para que todas las latencias salgan de la misma sesión. La tabla de costo por niveles de la tesis se arma con esta corrida, comparando siempre contra el B0 medido en ella.
+  - Los FLOPs previos a la optimización se calculan en el mismo proceso, con la CPU como dispositivo por defecto, como en las adaptaciones.
 
 ## 1. Decisión y objetivo
 
