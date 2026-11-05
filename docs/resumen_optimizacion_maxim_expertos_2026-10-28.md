@@ -4,7 +4,7 @@ Nov 4, 2026 · @Mati
 
 ## Objetivo y resultado principal
 
-Reemplazamos un bloque pesado de MAXIM por expertos pequeños, uno por tarea. El modelo bajó **13,5 % sus parámetros frente al baseline, de 14,18 M a 12,26 M**, sin perder calidad en test. Un módulo pequeño común, con el mismo costo, sí pierde calidad. Llevar los expertos también al nivel intermedio de la red duplica la reducción de FLOPs, a cambio de perder 0,3 dB en derain.
+Reemplazamos un bloque pesado de MAXIM por expertos pequeños, uno por tarea. El modelo bajó **13,5 % sus parámetros frente al baseline, de 14,18 M a 12,26 M**, sin perder calidad en test. Un módulo pequeño común, con el mismo costo, sí pierde calidad. Llevar los expertos también al nivel intermedio de la red duplica la reducción de FLOPs, pero pierde 0,26 dB en derain en test y baja la latencia sólo 2,3 %.
 
 El objetivo de esta fase era reducir el tamaño y el costo de MAXIM aprovechando los expertos por tarea. Partimos de dos modelos ya entrenados, MAXIM S-2 con cinco tareas: deblur, dehaze, denoise, derain y enhance.
 
@@ -46,10 +46,10 @@ La comparación central es S2 contra S1. Tienen el mismo costo de ejecución y s
 | S0\_sel | Shared con ejecución selectiva: calcula sólo el experto de la tarea. Mismos pesos y misma salida que S0 | 14,27 M |
 | S1\_d32 | S0\_sel con un módulo común de ancho 32 en lugar de las convoluciones del nivel 2 | 11,98 M |
 | **S2\_d32** | **S0\_sel con cinco expertos de ancho 32, uno por tarea, en el nivel 2** | **12,26 M** |
-| S1\_d32\_l12 | S1\_d32 con el módulo común también en el nivel 1 | 11,43 M |
-| S2\_d32\_l12 | S2\_d32 con los expertos también en el nivel 1 | 11,85 M |
-| S1\_d32\_l012 | S1\_d32\_l12 con el módulo común también en el nivel 0 | 11,30 M |
-| S2\_d32\_l012 | S2\_d32\_l12 con los expertos también en el nivel 0 | 11,80 M |
+| S1\_d32\_l12 | S1\_d32 con módulo común en niveles 1 y 2 | 11,43 M |
+| S2\_d32\_l12 | S2\_d32 con expertos en niveles 1 y 2 | 11,85 M |
+| S1\_d32\_l012 | S1\_d32\_l12 con el módulo común en todos los niveles | 11,30 M |
+| S2\_d32\_l012 | S2\_d32\_l12 con los expertos también en todos los niveles | 11,80 M |
 
 En el benchmark de costo también medimos otras versiones como referencia:
 
@@ -60,10 +60,11 @@ En el benchmark de costo también medimos otras versiones como referencia:
 
 ## Pruebas realizadas
 
-Hicimos dos benchmarks de costo, dos adaptaciones con semillas distintas, la validación de cada una y un test final único. Después probamos llevar los expertos a más niveles de la red, con cuatro adaptaciones más y una validación con intervalos. Todas las corridas fueron en Colab con una GPU L4.
+Hicimos dos benchmarks de costo, dos adaptaciones con semillas distintas, la validación de cada una y un test final. Después probamos llevar los expertos a más niveles de la red, con cuatro adaptaciones más y una validación con intervalos. Con la decisión ya tomada, evaluamos esas versiones en test y medimos su costo en un benchmark aparte. Todas las corridas fueron en Colab con una GPU L4.
 
 | Fecha | Prueba | Qué se obtuvo |
 | --- | --- | --- |
+| 4/11 | Test y benchmark de las versiones por niveles | En test, S2\_d32\_l12 queda 0,05 dB por debajo de S2\_d32 y repite la pérdida en derain, −0,26 dB. Con 15,6 % menos FLOPs, la latencia baja sólo 2,3 %. Los modelos del 28/10 reproducen su test |
 | 3/11 | Validación con intervalos de las versiones por niveles | La pérdida de S2\_d32\_l12 en derain, −0,32 dB con IC [−0,37, −0,26], queda entera fuera del criterio. En el promedio empata con S2\_d32 |
 | 30/10–3/11 | Adaptación con expertos en los niveles 1 y 2, dos semillas | S2 iguala a la versión anterior en el promedio y duplica la reducción de FLOPs, pero pierde 0,3 dB en derain en las dos semillas. No cumple el criterio |
 | 28–29/10 | Adaptación con expertos en los tres niveles | S2 queda 0,38 dB por debajo del shared, con dehaze −1,82 dB. No cumple el criterio |
@@ -81,7 +82,7 @@ Hicimos dos benchmarks de costo, dos adaptaciones con semillas distintas, la val
 - Sólo se entrenan los módulos nuevos, 5 épocas de 2.000 pasos.
 - La pérdida combina la reconstrucción de la imagen limpia, la imitación de la salida del profesor y la imitación de las salidas de los bloques reemplazados.
 - S1 y S2 ven exactamente los mismos datos en el mismo orden.
-- La mejor época se elige en validación. El test se usó una sola vez, con la comparación principal fijada de antemano: S2 contra S1.
+- La mejor época se elige en validación. El test se usó dos veces, siempre con lo que se iba a comparar fijado de antemano: el 28/10, S2 contra S1; el 4/11, las versiones por niveles, ya decididas con validación.
 
 ## Reducción de costo
 
@@ -94,12 +95,12 @@ S2 tiene **1,92 M parámetros menos que el baseline, −13,5 %**, y 2,01 M menos
 | S0\_sel | 14,27 M | 218,9 | 42,2 | 256,3 |
 | S1\_d32 | 11,98 M | 200,5 | 41,1 | 252,8 |
 | **S2\_d32** | **12,26 M** | **200,5** | **41,1** | **252,6** |
-| S1\_d32\_l12 | 11,43 M | 182,6 | sin medir | sin medir |
-| S2\_d32\_l12 | 11,85 M | 182,6 | sin medir | sin medir |
-| S1\_d32\_l012 | 11,30 M | 166,0 | sin medir | sin medir |
-| S2\_d32\_l012 | 11,80 M | 166,0 | sin medir | sin medir |
+| S1\_d32\_l12 | 11,43 M | 182,6 | 41,1 (−1,4 %) | 251,4 (−2,4 %) |
+| S2\_d32\_l12 | 11,85 M | 182,6 | 40,8 (−2,3 %) | 251,4 (−2,5 %) |
+| S1\_d32\_l012 | 11,30 M | 165,9 | 39,9 (−4,5 %) | 251,6 (−2,4 %) |
+| S2\_d32\_l012 | 11,80 M | 165,9 | 40,0 (−4,2 %) | 249,7 (−3,1 %) |
 
-Latencia: mediana en una GPU L4 con batch 1, en float32. FLOPs: conteo del programa antes de optimizar, igual para todas las versiones. Las versiones con el módulo en más niveles no pasaron por el benchmark, así que no tienen latencia medida. Sus FLOPs se contaron el 3/11 con el mismo método en otro entorno de Colab, que suma 0,08 GFLOP a todas las versiones; los porcentajes frente a B0 no cambian.
+Latencia: mediana en una GPU L4 con batch 1, en float32. FLOPs: conteo del programa antes de optimizar, igual para todas las versiones. Las filas hasta S2\_d32 son del benchmark v2 del 18/10. Las versiones por niveles se midieron el 4/11 en otra corrida, junto con B0 y S2\_d32. Entre paréntesis, su diferencia frente al B0 de esa misma corrida, que dio 41,7 y 257,7 ms. En esa corrida, S2\_d32 quedó −0,3 % y −0,8 % frente a B0, dentro de la variación entre mediciones.
 
 **Lo que gana S2 frente al baseline B0:**
 
@@ -127,14 +128,18 @@ En test, **S2 supera a S1 por 0,066 dB de PSNR macro**, con un intervalo de conf
 | S0\_sel | 28,137 | 27,309 | 0,8496 |
 | S1\_d32, promedio de 2 semillas | 28,074 | 27,278 | 0,8495 |
 | **S2\_d32, promedio de 2 semillas** | **28,140** | **27,334** | **0,8497** |
+| S1\_d32\_l12, una semilla | 27,872 | 27,172 | 0,8445 |
+| S2\_d32\_l12, promedio de 2 semillas | 28,093 | 27,336 | 0,8478 |
+| S1\_d32\_l012, una semilla | 27,526 | 27,004 | 0,8359 |
+| S2\_d32\_l012, una semilla | 28,015 | 27,330 | 0,8459 |
 
-Las versiones con el módulo nuevo en más niveles no se evaluaron en test: se decidieron sólo con validación. Sus resultados están en [Expertos en más niveles](#expertos-en-más-niveles).
+Las versiones con el módulo nuevo en más niveles se decidieron sólo con validación y se evaluaron en test el 4/11, ya cerrada la decisión. Sus diferencias están en [Expertos en más niveles](#expertos-en-más-niveles).
 
 *Figura: runs\_logs/compresion\_test\_final · 4.730 imágenes de test, bootstrap pareado estratificado por tarea. Ver la versión PDF, `resumen_optimizacion_maxim_expertos_2026-10-28.pdf`.*
 
 - **Las dos semillas coinciden:** S2 − S1 da +0,059 dB en una y +0,073 dB en la otra.
 - **Por tarea, S2 no pierde frente a S1 en ninguna.** Las ganancias son denoise +0,17 dB, derain +0,08, dehaze +0,06, deblur +0,03 y enhance 0,00.
-- **En validación la ventaja de S2 sobre S1 era mayor,** +0,115 dB promediando las dos semillas, IC \[+0,086, +0,154\]. Es esperable, porque la mejor época se eligió en validación. Allí S2 incluso superaba al shared por 0,055 dB, pero en test empata. En cambio, la pérdida de S1 frente al shared es igual en los dos splits: −0,060 dB en validación y −0,063 en test.
+- **En validación la ventaja de S2 sobre S1 era mayor,** +0,115 dB promediando las dos semillas, IC [+0,086, +0,154]. Es esperable, porque la mejor época se eligió en validación. Allí S2 incluso superaba al shared por 0,055 dB, pero en test empata. En cambio, la pérdida de S1 frente al shared es igual en los dos splits: −0,060 dB en validación y −0,063 en test.
 - **El reparto por tarea depende del split, no de la semilla.** En validación, la ventaja de S2 sobre S1 viene sobre todo de dehaze, con +0,33 y +0,41 dB, y en denoise es apenas negativa; las dos semillas dan el mismo patrón. En test, en cambio, la mayor ganancia está en denoise. Lo que se mantiene en las cuatro combinaciones de split y semilla es que S2 supera a S1 en el promedio.
 - **Frente al baseline, el intervalo macro es ancho por diferencias que ya tenía el shared.** En enhance pierde 0,37 dB frente al baseline y en dehaze gana entre 0,2 y 0,3 dB. La compresión no las introduce.
 
@@ -157,19 +162,41 @@ Validación, en dB, frente al shared S0\_sel. Con dos valores: semilla 1 / semil
 - **Pero pierde unos 0,3 dB en derain, en las dos semillas, y por eso no cumple el criterio.** Frente al shared, derain queda en −0,32 dB con IC [−0,37, −0,26]: todo el intervalo está más allá del límite de −0,10, así que no es ruido. Seguir entrenando no lo corrige: derain se estanca en las dos últimas épocas.
 - **Con los tres niveles la pérdida es mayor, sobre todo en dehaze.** Agregar el nivel 0 casi no ahorra parámetros: con 32 canales, un módulo de ancho 32 no comprime nada. Cada nivel afecta a una tarea distinta: el nivel 1 a derain y el nivel 0 a dehaze.
 - **Cuanto más se comprime, más valen los expertos.** S2 supera al módulo común S1 por 0,11 dB con el nivel 2, 0,41 dB con los niveles 1 y 2, y 0,75 dB con los tres, en la semilla 1, siempre con intervalos que excluyen el cero. Con menos capacidad local, importa más que la corrección sea específica de cada tarea.
-- **Son números de validación,** la misma con que se eligió cada época, así que son optimistas. Los intervalos son de bootstrap pareado, estratificado por tarea, sobre 2.303 imágenes. La latencia de S2\_d32\_l12 todavía no se midió: con S2\_d32, −7,3 % de FLOPs dio sólo −1,1 % de latencia.
+- **Son números de validación,** la misma con que se eligió cada época, así que son optimistas. Los intervalos son de bootstrap pareado, estratificado por tarea, sobre 2.303 imágenes.
+
+### Test y latencia
+
+Con la decisión ya tomada, el 4/11 evaluamos estas versiones en test y medimos su latencia, todas en una misma corrida del benchmark.
+
+| Versión | Δ macro vs shared | Peor tarea vs shared | Latencia a 256 vs B0 |
+| --- | --: | --- | --: |
+| S1\_d32 | −0,070 / −0,056 | denoise −0,14 / dehaze −0,18 | −1,0 % |
+| S2\_d32 | −0,011 / +0,017 | dehaze −0,07 / −0,12 | −0,3 % |
+| S1\_d32\_l12 | −0,264 | dehaze −0,70 | −1,4 % |
+| S2\_d32\_l12 | −0,106 / +0,019 | dehaze −0,41 / derain −0,26 | −2,3 % |
+| S1\_d32\_l012 | −0,611 | dehaze −1,56 | −4,5 % |
+| S2\_d32\_l012 | −0,122 | dehaze −0,46 | −4,2 % |
+
+Test, 4.730 imágenes, en dB frente al shared S0\_sel. Con dos valores: semilla 1 / semilla 2. Latencia: mediana a 256×256 en L4, frente al B0 de la misma corrida; la variación entre mediciones llega al 3,9 % en algunas versiones.
+
+- **En test, S2\_d32\_l12 queda por debajo de S2\_d32.** Promediando las semillas, la diferencia es −0,047 dB de PSNR macro, con IC [−0,085, −0,004], y −0,044 frente al shared, con IC [−0,109, +0,026]. En validación empataba con S2\_d32.
+- **La pérdida en derain se repite:** −0,26 dB en las dos semillas, con IC [−0,31, −0,22].
+- **La ganancia en dehaze no se repite.** Era +0,33 dB en validación y es −0,24 en test, con IC [−0,39, −0,08], sobre todo por la semilla 1: −0,41 frente a −0,07. Las dos semillas difieren mucho en el macro, −0,106 y +0,019, así que con dos semillas el promedio de test todavía es incierto.
+- **La ventaja de los expertos también crece en test.** S2 supera a S1 por 0,06 dB con el nivel 2, 0,16 con los niveles 1 y 2, y 0,49 con los tres, en la semilla 1.
+- **Los FLOPs casi no se convierten en tiempo.** Con los niveles 1 y 2, −15,6 % de FLOPs da −2,3 % de latencia a 256 y −2,5 % a 512. Con los tres niveles, −23,3 % da −4,2 % y −3,1 %. Después de compilar, estas versiones hacen algo más de cálculo y de accesos a memoria que B0, y lanzan más kernels: los módulos nuevos son operaciones pequeñas en un modelo limitado por memoria.
+- **El test no cambia la decisión.** S2\_d32 sigue siendo la versión principal y S2\_d32\_l12 el punto de compromiso, ahora con sus números de test. En test sólo S2\_d32 con la semilla 1 cumpliría el criterio: con la semilla 2, dehaze queda en −0,12 dB, como ya ocurría el 28/10.
 
 ## Conclusiones y próximo paso
 
 Los expertos por tarea permiten achicar MAXIM un 13,5 % sin perder calidad. Un módulo común del mismo costo no lo logra.
 
 1. **La especialización es lo que conserva la calidad.** S1 y S2 tienen el mismo costo de ejecución, y sólo S2 iguala al shared.
-2. **El ahorro es de tamaño y de operaciones, no de tiempo.** Parámetros −13,5 % y FLOPs −7,3 %, con latencia prácticamente igual.
+2. **El ahorro es de tamaño y de operaciones, no de tiempo.** Parámetros −13,5 % y FLOPs −7,3 %, con latencia prácticamente igual. Incluso con los niveles 1 y 2, −15,6 % de FLOPs da sólo −2,3 % de latencia.
 3. **Especializar casi no cuesta:** 2,3 % más de parámetros guardados que el módulo común, y el mismo tiempo de ejecución.
 4. **La adaptación es barata:** se entrenan sólo los módulos nuevos, con la mitad de tiempo y memoria por paso.
-5. **Llevar los expertos a más niveles es un compromiso, no un ahorro gratis.** Con los niveles 1 y 2, S2 baja los FLOPs 15,6 % con la misma calidad promedio, pero pierde 0,32 dB en derain, una pérdida que el intervalo confirma. Con menos capacidad, la ventaja de los expertos sobre el módulo común crece.
+5. **Llevar los expertos a más niveles es un compromiso, no un ahorro gratis.** Con los niveles 1 y 2, S2 baja los FLOPs 15,6 % y la latencia 2,3 %, pero pierde entre 0,26 y 0,32 dB en derain, en validación y en test. En test queda además 0,05 dB por debajo de S2\_d32 en el promedio. Con menos capacidad, la ventaja de los expertos sobre el módulo común crece.
 
-**Próximo paso:** medir la latencia de S2\_d32\_l12 en el benchmark de costo, para presentarla como punto de compromiso entre costo y calidad. La versión principal sigue siendo S2\_d32, la única que no pierde calidad en ninguna tarea.
+**Estado:** los experimentos de esta fase están cerrados. La versión principal es S2\_d32, la única que no pierde calidad en ninguna tarea en validación. S2\_d32\_l12 se presenta como punto de compromiso, con sus números de test. Una convolución por canal de 5×5, que recuperaría el entorno de 5×5 de las dos convoluciones originales, queda como trabajo futuro: podría explicar parte de la pérdida en derain.
 
 **Otro paso posible: usar el modelo sin conocer la tarea.** Hoy S2 necesita el `task_id` de cada imagen. Calcular los cinco expertos no lo reemplaza: igual hay que elegir uno, y promediarlos aplicaría correcciones de otras degradaciones.
 

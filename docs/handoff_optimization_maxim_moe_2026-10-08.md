@@ -146,6 +146,38 @@ Esta sección resume lo ocurrido desde el 8 de octubre y **prevalece sobre las s
   - B0, S0_sel y S2_d32 se vuelven a medir para que todas las latencias salgan de la misma sesión. La tabla de costo por niveles de la tesis se arma con esta corrida, comparando siempre contra el B0 medido en ella.
   - Los FLOPs previos a la optimización se calculan en el mismo proceso, con la CPU como dispositivo por defecto, como en las adaptaciones.
 
+**Test y benchmark por niveles, resultados del 4/11: S2_d32 se confirma; S2_d32_l12 rinde menos en test que en validación y ahorra poco tiempo.** Ambas corridas se hicieron en L4 desde el commit e8e9af5, con estado `complete` y todas las verificaciones en verdadero. Lo registrado antes de correr se cumple: la decisión no cambia y no se evalúan más modelos en test.
+
+- **Control.** B0, S0_sel y S1/S2_d32 v1 y v2 reproducen el test del 28/10 con diferencias menores a 0,0002 dB. Los números de S2_d32 de la tesis siguen siendo los del 28/10. Resultados en `runs_logs/compresion_test_niveles/`, protocolo 4e09f607…, 4730 pares.
+- **Análisis principal en test**, promediado entre réplicas, IC 95 %:
+
+| Tarea | S2_d32_l12 − S0_sel | IC 95 % | S2_d32_l12 − S2_d32 | IC 95 % |
+|---|---:|---|---:|---|
+| deblur | +0,057 | [+0,037, +0,080] | +0,026 | [+0,022, +0,031] |
+| dehaze | −0,240 | [−0,394, −0,076] | −0,144 | [−0,277, −0,008] |
+| denoise | +0,186 | [+0,142, +0,246] | +0,105 | [+0,080, +0,134] |
+| derain | −0,263 | [−0,309, −0,215] | −0,248 | [−0,289, −0,207] |
+| enhance | +0,042 | [−0,249, +0,344] | +0,029 | [−0,098, +0,185] |
+| **Macro** | **−0,044** | [−0,109, +0,026] | **−0,047** | [−0,085, −0,004] |
+| Ponderado | +0,026 | [+0,006, +0,050] | +0,002 | [−0,010, +0,015] |
+
+- **La pérdida en derain se repite en test**: −0,26 dB, con las dos réplicas en −0,26 y todo el intervalo fuera del límite de −0,10. Es la conclusión más firme sobre l12.
+- **La ganancia en dehaze de validación no se repite.** En validación era +0,33; en test es −0,24, por la réplica v1 (−0,41 frente a −0,07 de v2). Por eso el macro de l12 cae de +0,069 en validación a −0,044 en test, y frente a S2_d32 pasa de empate (+0,014) a peor (−0,047, con un intervalo que excluye el cero). Las réplicas difieren mucho: el macro frente a S0_sel es −0,106 en v1 y +0,019 en v2. El ponderado, dominado por deblur y denoise, sigue en positivo.
+- **El resto confirma la validación.** S2_d32 − S0_sel +0,003 [−0,037, +0,043]; S2_d32 − S1_d32 +0,066 [+0,049, +0,084], con las cinco tareas en positivo o empate. S2 − S1 en la réplica v1 crece con los niveles: +0,059 en el nivel 2, +0,159 en los niveles 1 y 2 y +0,489 en los tres. Cuanto más se reemplaza, más valen los especialistas. Las l012 y S1_d32_l12 pierden entre −0,12 y −0,61 dB de macro.
+- **Criterio descriptivo en test.** Sólo S2_d32_v1 lo cumple. S2_d32_v2 queda fuera por dehaze, −0,123, como ya ocurría el 28/10. No cambia nada: el criterio se aplica en validación.
+- **Benchmark** en `runs_logs/benchmark_maxim_niveles/`, protocolo 46124f26…, todas las versiones en un mismo proceso. Latencia: mediana; dispersión entre bloques a 256 de 0,2 a 3,9 %, y a 512 ≤ 1,3 %.
+
+| Variante | Parámetros vs B0 | GFLOP 256 vs B0 | ms 256 | vs B0 | ms 512 | vs B0 | Paso de adaptación |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| B0 | 14,18 M | 216,3 | 41,73 | — | 257,68 | — | 452,9 ms (completo) |
+| S0_sel | +0,7 % | +1,2 % | 42,18 | +1,1 % | 259,33 | +0,6 % | — |
+| S2_d32 | −13,5 % | −7,3 % | 41,62 | −0,3 % | 255,65 | −0,8 % | 230,5 ms |
+| S2_d32_l12 | −16,4 % | −15,6 % | 40,78 | −2,3 % | 251,36 | −2,5 % | 238,3 ms |
+| S2_d32_l012 | −16,8 % | −23,3 % | 39,98 | −4,2 % | 249,72 | −3,1 % | 256,1 ms |
+
+- **Los FLOPs no se traducen en tiempo.** l12 recorta el 15,6 % de los GFLOP previos a la optimización y sólo el 2,3–2,5 % de la latencia. Los GFLOP compilados suben levemente: 129,9 en B0 y 131,6 en l12. Los GB accedidos también suben (15,68 frente a 15,83) y aparecen más kernels (2087 frente a 2164). La red está limitada por memoria y lanzamientos, no por cómputo, y el módulo nuevo agrega operaciones chicas. El ahorro de S2_d32 (−0,3 % y −0,8 %) cae dentro de la dispersión, en línea con el −1,1 % del benchmark v2. Ninguna versión cambia la memoria temporal de inferencia.
+- **Conclusión para la tesis.** S2_d32 sigue siendo la variante principal: −13,5 % de parámetros y −7,3 % de GFLOP, con calidad de test igual a la del profesor y a B0, y latencia sin cambios. S2_d32_l12 se mantiene como punto de compromiso, como estaba registrado, pero se presenta con sus números de test: −0,04 dB de macro frente al profesor y −0,05 frente a S2_d32, −0,26 dB en derain en los dos splits, dehaze inestable entre semillas y −2,4 % de latencia. El argumento de costo de esta fase es de parámetros y FLOPs; el tiempo en GPU prácticamente no cambia.
+
 ## 1. Decisión y objetivo
 
 En la reunión con los profesores se decidió orientar la siguiente fase a reducir el costo computacional conservando calidad. La evidencia actual no permite asegurar una mejora robusta de calidad frente al baseline. Esto no equivale a haber realizado una prueba formal de significancia.
