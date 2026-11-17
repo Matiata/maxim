@@ -23,6 +23,8 @@ BENCHMARK_V2 = (REPO_ROOT / "notebooks" / "benchmark"
                 / "benchmark_maxim_v2_compresion.ipynb")
 BENCHMARK_LEVELS = (REPO_ROOT / "notebooks" / "benchmark"
                     / "benchmark_maxim_niveles.ipynb")
+BENCHMARK_TRAINING = (REPO_ROOT / "notebooks" / "benchmark"
+                      / "benchmark_entrenamiento.ipynb")
 ALL = (ADAPTATION, ADAPTATION_SEED2, ADAPTATION_L012, ADAPTATION_L12,
        VALIDATION, VALIDATION_LEVELS, TEST, TEST_LEVELS)
 
@@ -251,6 +253,45 @@ class CompressionNotebooksTest(unittest.TestCase):
             '("S2_d32_l12", "new_only")', '"B0", "S0_sel",',
             'CHECKPOINT_ROOT / "benchmark_maxim_niveles"',
             'with jax.default_device(jax.devices("cpu")[0]):',
+            "WARMUP_EXECUTIONS = 10", "TIMED_EXECUTIONS = 100",
+        ):
+            self.assertIn(marker, source)
+
+    def test_training_benchmark_notebook(self):
+        notebook, source = code_source(BENCHMARK_TRAINING)
+        for cell in notebook["cells"]:
+            if cell["cell_type"] == "code":
+                self.assertIsNone(cell.get("execution_count"))
+                self.assertEqual(cell.get("outputs"), [])
+                ast.parse("".join(cell["source"]))
+        match = re.search(r"EXPECTED_SOURCE_SHA256 = (\{.*?\})\n", source, re.S)
+        for relative, digest in json.loads(match.group(1)).items():
+            actual = hashlib.sha256((REPO_ROOT / relative).read_bytes())
+            self.assertEqual(actual.hexdigest(), digest, relative)
+        levels, _ = code_source(BENCHMARK_LEVELS)
+        a = ["".join(c["source"]) for c in levels["cells"] if c["cell_type"] == "code"]
+        b = ["".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code"]
+        self.assertEqual(len(a), len(b))
+        changed = [x.split("\n")[0] for x, y in zip(a, b) if x != y]
+        self.assertEqual(changed, [
+            "# 3. Configuración visible antes de medir",
+            "# 5. Protocolo y resultado reanudable",
+            "# 8. Forward de inferencia y paso real de entrenamiento",
+            "# 12. Grupo de entrenamiento: pasos reales con batch mixto de tareas",
+            "# 13. Orquestación",
+            "# 14. Reporte legible derivado del JSON, sin decisiones"])
+        # El paso de adaptación replica el del notebook de adaptación.
+        _, adaptation = code_source(ADAPTATION)
+        for marker in ("DISTILL_OUTPUT_WEIGHT = 1.0", "FEATURE_DISTILL_WEIGHT = 0.1",
+                       "error / (jnp.mean(target ** 2) + 1e-6)",
+                       "jax.lax.stop_gradient(target)"):
+            self.assertIn(marker, adaptation)
+            self.assertIn(marker, source)
+        for marker in (
+            '("B0", "full")', '("S2_d32", "full")', '("S2_d32", "new_only")',
+            '("S2_d32", "adapt")', '("S2_d32_l12", "adapt")',
+            'TEACHER_VARIANT = "S0_sel"', "RUN_INFERENCE = False",
+            'CHECKPOINT_ROOT / "benchmark_entrenamiento"',
             "WARMUP_EXECUTIONS = 10", "TIMED_EXECUTIONS = 100",
         ):
             self.assertIn(marker, source)
