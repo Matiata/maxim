@@ -113,6 +113,8 @@ Acá van los agradecimientos. Esta sección es optativa.
 
 {
   \hypersetup{linkcolor=black}
+  % El índice lista capítulos y secciones; las subsecciones sólo van en el texto.
+  \setcounter{tocdepth}{1}
   \tableofcontents
   \listoffigures
   \renewcommand{\listtablename}{Índice de tablas}
@@ -127,330 +129,311 @@ Acá van los agradecimientos. Esta sección es optativa.
 \chapter{Introducción}
 \label{chap:introduccion}
 
-La producción y el intercambio de imágenes digitales forman parte de una gran
-cantidad de actividades cotidianas, científicas e industriales. Las imágenes
-capturadas por cámaras, teléfonos, sistemas de vigilancia, instrumental médico
-o sensores remotos rara vez se obtienen en condiciones ideales. El movimiento
-de la cámara o de la escena puede introducir desenfoque; la iluminación
-insuficiente reduce el contraste y oculta detalles; las condiciones
-atmosféricas alteran la visibilidad; el ruido del sensor degrada las regiones de
-baja señal y la lluvia puede superponer estructuras ajenas a la escena. Estas
-alteraciones no solo afectan la calidad visual, sino que también pueden
-perjudicar tareas posteriores de visión por computadora, como la detección, la
-segmentación o el reconocimiento de objetos.
+Las imágenes que capturan cámaras, teléfonos o sensores rara vez se obtienen en condiciones ideales. El movimiento produce desenfoque, la neblina reduce la visibilidad, el sensor agrega ruido, la lluvia superpone estructuras ajenas a la escena y la poca luz oculta detalles. La restauración de imágenes busca recuperar una versión limpia a partir de la observación degradada. Con redes neuronales profundas, lo habitual es entrenar un modelo por degradación. Un único modelo para todas es más simple de mantener, aunque debe aprender transformaciones muy distintas con los mismos parámetros.
 
-La restauración de imágenes estudia cómo recuperar una imagen limpia a partir
-de una observación degradada. El problema es difícil porque diferentes imágenes
-limpias pueden dar lugar a degradaciones similares y porque, en aplicaciones reales,
-el tipo y la intensidad de la degradación no siempre son conocidos. Por esta razón,
-una reconstrucción adecuada requiere aprovechar tanto la información local: bordes, texturas y
-detalles finos, así como el contexto global de la imagen.
+Este trabajo parte de MAXIM \citep{tu2022maxim}, una red de restauración que combina información local y global de la imagen, y estudia cómo especializarla para cinco degradaciones: desenfoque, neblina, ruido, lluvia y baja iluminación. La herramienta elegida es la mezcla de expertos \citep{jacobs1991adaptive,shazeer2017outrageously}: en lugar de que toda la red resuelva cada caso del mismo modo, se agregan módulos especializados, los expertos, y para cada imagen se activa el que corresponde.
 
-Durante los últimos años, los métodos basados en aprendizaje profundo han
-reemplazado gran parte de los procedimientos diseñados de manera específica
-para cada degradación. A partir de pares de imágenes degradadas y sus
-correspondientes referencias, una red neuronal puede aprender una transformación
-de restauración, sin embargo, es habitual entrenar un modelo distinto para
-cada tarea. Esta estrategia permite una alta especialización, pero obliga a
-mantener y ejecutar varios modelos cuando un sistema debe responder correctamente
-ante degradaciones variadas.
+El trabajo tuvo tres etapas. En la primera, un componente aprendido, el ruteador, elegía los expertos a partir de la imagen de entrada. No se le decía a qué degradación correspondía cada imagen; se esperaba que aprendiera a reconocerla. El modelo aprendió, pero no superó a MAXIM, y el ruteador terminó repartiendo el peso por igual entre los expertos. En la segunda se depuraron los datos y se probaron distintas variantes: sumar expertos, usar expertos compartidos entre tareas y especializarlos en características aprendidas de la imagen en lugar de en degradaciones. La mejor, con expertos asignados a cada tarea, igualó la calidad de MAXIM, pero no la mejoró. La tercera etapa cambió la pregunta: si los expertos no mejoran la calidad, ¿permiten reducir el costo? Uno de los bloques más pesados de MAXIM se reemplazó por módulos treinta y cuatro veces más chicos, uno por tarea, entrenados a partir del modelo existente.
 
-Una alternativa consiste en entrenar un único modelo para varias tareas de
-restauración. Este enfoque reduce la duplicación de parámetros y permite
-compartir representaciones entre problemas relacionados. Al mismo tiempo,
-introduce una dificultad: eliminar ruido, compensar desenfoque, remover lluvia,
-reducir neblina y realzar una imagen oscura requieren transformaciones
-diferentes y, en algunos casos, parcialmente opuestas. Un único camino de
-cómputo debe aprender entonces una solución suficientemente general para todas
-ellas. Si la capacidad compartida no puede adaptarse al tipo de degradación
-presente en cada entrada, el aprendizaje conjunto puede producir interferencia
-entre tareas y limitar la calidad de la reconstrucción.
+El resultado principal es que los expertos por tarea reducen los parámetros de MAXIM un 13,5~\% y sus operaciones un 7,3~\%, sin pérdida medible de calidad en test. Un módulo común a todas las tareas, con el mismo costo de ejecución, sí pierde calidad: la especialización es lo que la conserva. Llevar los expertos a más partes de la red duplica la reducción de operaciones, pero empieza a perder calidad en algunas tareas, sobre todo en la remoción de lluvia. El ahorro es de tamaño y de cómputo, no de tiempo: como el modelo está limitado por los accesos a memoria, la latencia casi no cambia. Obtener la versión comprimida de un modelo ya entrenado cuesta menos de una hora de GPU, contra casi ocho horas de entrenar MAXIM desde cero.
 
-En este trabajo se adopta MAXIM (\textit{Multi-Axis MLP for Image Processing}) como 
-arquitectura base para la restauración de imágenes \citep{tu2022maxim}. Su diseño sigue una estructura codificador/decodificador tipo U-Net, con conexiones \textit{skip} que combinan características de bajo y alto nivel y contribuyen a preservar la información espacial. A diferencia de las arquitecturas puramente convolucionales, MAXIM incorpora bloques \textit{Multi-Axis Gated MLP}, que capturan interacciones locales  y globales. Esta combinación permite integrar información en distintas escalas y capturar tanto detalles finos como patrones globales. Sin embargo, en su formulación estándar, todas las imágenes atraviesan el mismo flujo de procesamiento, independientemente del tipo de degradación presente, lo que motiva estudiar mecanismos de especialización para un escenario de restauración multi-tarea.
-
-La hipótesis que motiva esta tesis es que dicho flujo compartido puede
-complementarse con el paradigma \textit{Mixture of Experts} (MoE). En una mezcla
-de expertos, varios módulos con capacidad de especialización colaboran bajo el
-control de un ruteador, que asigna a cada experto un peso en base a 
-la entrada \citep{jacobs1991adaptive,shazeer2017outrageously}. En lugar de exigir
-que todos los parámetros resuelvan de la misma forma cualquier degradación, el
-modelo puede compartir una parte sustancial del procesamiento y reservar otra
-parte para respuestas especializadas. El ruteador actúa como un mecanismo de
-adaptación: a partir de las características de la imagen, determina qué expertos
-deben intervenir y con qué peso en la reconstrucción.
-
-La combinación de MAXIM y MoE plantea un compromiso entre generalización,
-especialización y costo computacional. Replicar una red completa por cada tarea
-produciría especialistas independientes, pero eliminaría gran parte del
-beneficio de un modelo unificado. En el extremo opuesto, reemplazar por completo
-la salida de MAXIM con expertos inicializados de manera similar puede dificultar
-la diferenciación entre ellos y perder una referencia común de reconstrucción.
-La arquitectura estudiada en este trabajo conserva, por lo tanto, una cabeza
-compartida equivalente a la salida original de MAXIM y utiliza los expertos para
-modelar correcciones residuales condicionadas por la entrada. Si estas
-correcciones son nulas, el modelo recupera exactamente el camino compartido de
-la arquitectura base.
-
-La ubicación de los expertos, su capacidad, la señal utilizada por el ruteador
-y la forma de entrenar la mezcla continúan siendo decisiones centrales. En
-particular, el ruteador puede activar todos los expertos o seleccionar solamente
-un subconjunto mediante un esquema \textit{top-k}. También es necesario
-preservar los mecanismos de supervisión profunda y multi-escala de MAXIM. En la
-implementación considerada, las salidas auxiliares permanecen conectadas a sus
-pérdidas originales y la mezcla de expertos modifica únicamente la predicción
-final a resolución completa.
-beneficio de un modelo unificado. En el extremo opuesto, reemplazar por completo
-la salida de MAXIM con expertos inicializados de manera similar puede dificultar
-la diferenciación entre ellos y perder una referencia común de reconstrucción.
-La arquitectura estudiada en este trabajo conserva, por lo tanto, una cabeza
-compartida equivalente a la salida original de MAXIM y utiliza los expertos para
-modelar correcciones residuales condicionadas por la entrada. Si estas
-correcciones son nulas, el modelo recupera exactamente el camino compartido de
-la arquitectura base.
-
-La ubicación de los expertos, su capacidad, la señal utilizada por el ruteador
-y la forma de entrenar la mezcla continúan siendo decisiones centrales. En
-particular, el ruteador puede activar todos los expertos o seleccionar solamente
-un subconjunto mediante un esquema \textit{top-k}. También es necesario
-preservar los mecanismos de supervisión profunda y multi-escala de MAXIM. En la
-implementación considerada, las salidas auxiliares permanecen conectadas a sus
-pérdidas originales y la mezcla de expertos modifica únicamente la predicción
-final a resolución completa.
-
-El problema abordado puede formularse del siguiente modo: dada una colección
-de pares $(x,y)$, donde $x$ es una imagen afectada por alguna de varias
-degradaciones e $y$ es su referencia limpia, se busca aprender una función
-$F$ tal que $F(x)$ aproxime a $y$ sin requerir, como condición de entrada, una
-etiqueta que indique la tarea. Para la variante con expertos, esta función se
-expresa conceptualmente como
-
-\begin{equation}
-  \widehat{y} = x {}+ H_{\mathrm{comp}}\!\left(f_{\theta}(x)\right)
-  {}+ \sum_{k=1}^{K} p_k\!\left(f_{\theta}(x)\right)
-      \,\Delta E_k\!\left(f_{\theta}(x)\right),
-  \widehat{y} = x {}+ H_{\mathrm{comp}}\!\left(f_{\theta}(x)\right)
-  {}+ \sum_{k=1}^{K} p_k\!\left(f_{\theta}(x)\right)
-      \,\Delta E_k\!\left(f_{\theta}(x)\right),
-  \label{eq:intro-moe}
-\end{equation}
-
-donde $f_{\theta}$ representa las características compartidas producidas por
-MAXIM, $H_{\mathrm{comp}}$ es la cabeza de reconstrucción compartida y
-$\Delta E_k$ es la corrección propuesta por el $k$-ésimo experto. El término
-$x$ conserva la conexión residual entre la imagen degradada y la predicción
-final. Los pesos $p_k$ representan las asignaciones finales del ruteador,
-calculadas a partir de las características de la entrada, y satisfacen
-$p_k\geq 0$ y $\sum_{k=1}^{K}p_k=1$. En un ruteo \textit{top-k}, como máximo
-$k$ de estos pesos son distintos de cero. La Ecuación~\ref{eq:intro-moe}
-describe la idea general; la
-capacidad de las cabezas, la forma concreta del ruteador y las pérdidas
-donde $f_{\theta}$ representa las características compartidas producidas por
-MAXIM, $H_{\mathrm{comp}}$ es la cabeza de reconstrucción compartida y
-$\Delta E_k$ es la corrección propuesta por el $k$-ésimo experto. El término
-$x$ conserva la conexión residual entre la imagen degradada y la predicción
-final. Los pesos $p_k$ representan las asignaciones finales del ruteador,
-calculadas a partir de las características de la entrada, y satisfacen
-$p_k\geq 0$ y $\sum_{k=1}^{K}p_k=1$. En un ruteo \textit{top-k}, como máximo
-$k$ de estos pesos son distintos de cero. La Ecuación~\ref{eq:intro-moe}
-describe la idea general; la
-capacidad de las cabezas, la forma concreta del ruteador y las pérdidas
-empleadas se presentan en los capítulos metodológicos.
-
-El objetivo general de esta tesis es diseñar y evaluar una extensión de MAXIM
-basada en mezcla de expertos para restaurar imágenes afectadas por distintos
-tipos de degradación dentro de un único modelo. La evaluación busca determinar
-si la especialización aporta ventajas frente a una versión base MAXIM multi-tarea entrenada en condiciones equivalentes.
-
-Para alcanzar este objetivo general se plantean los siguientes objetivos
-específicos:
-
-\begin{itemize}
-  \item implementar y entrenar una versión base de MAXIM que sirva como referencia
-        reproducible para las comparaciones;
-  \item construir un conjunto de entrenamiento multi-tarea con ejemplos de
-        eliminación de desenfoque, neblina, ruido y lluvia, además de realce de
-        imágenes con baja iluminación;
-  \item incorporar una cabeza compartida y expertos residuales a la arquitectura,
-        conservando la supervisión profunda y el procesamiento en múltiples
-        escalas;
-  \item incorporar una cabeza compartida y expertos residuales a la arquitectura,
-        conservando la supervisión profunda y el procesamiento en múltiples
-        escalas;
-  \item estudiar estrategias de ruteo y regularización que favorezcan el uso
-        diferenciado de los expertos sin provocar una asignación degenerada;
-  \item comparar las variantes mediante métricas cuantitativas de calidad,
-        inspección visual, costo computacional y análisis del comportamiento del
-        ruteador.
-\end{itemize}
-
-La comparación experimental se diseña para aislar, en la medida de lo posible,
-el efecto de la mezcla de expertos. Esto exige utilizar los mismos datos, el
-mismo presupuesto de entrenamiento y configuraciones de capacidad comparables
-entre el modelo propuesto y la línea base. Además de medir la calidad final de
-las imágenes, es necesario observar si los expertos desarrollan funciones
-diferenciadas y si las decisiones del ruteador guardan relación con las
-degradaciones presentes. De este modo, el análisis no queda limitado a una
-única métrica agregada, sino que considera también el mecanismo que se pretende
-introducir.
-
-El alcance del trabajo se concentra en restauración supervisada de imágenes y
-en un conjunto finito de degradaciones representadas por conjuntos de datos de
-referencia. No se presupone que cada experto deba corresponder de manera rígida
-con una tarea: la especialización puede organizarse por tipo de degradación,
-nivel de severidad o patrones visuales compartidos. Tampoco se asume de
-antemano que la incorporación de expertos producirá una mejora. Su utilidad
-debe establecerse mediante una comparación controlada con MAXIM y mediante el
-análisis de las rutas aprendidas durante el entrenamiento.
-
-El resto de la tesis se organiza de la siguiente manera. En primer lugar se
-presentan los fundamentos de restauración de imágenes, MAXIM y las mezclas de
-expertos. A continuación se describen las herramientas utilizadas, los conjuntos
-de datos, la arquitectura propuesta, la implementación y el protocolo
-experimental. Finalmente, se exponen y discuten los resultados de las
-comparaciones, para luego presentar las conclusiones y posibles líneas de
-continuación. Esta organización mantiene separados el planteo del problema, las
-decisiones metodológicas y la evidencia experimental utilizada para evaluar la
-propuesta.
+Los capítulos~\ref{chap:fundamentos-teoricos} a~\ref{chap:datos} presentan los fundamentos, las herramientas y los datos; los capítulos~\ref{chap:expertos} y~\ref{chap:compresion}, los experimentos, y el~\ref{chap:conclusiones}, las conclusiones.
 
 \chapter{Fundamentos teóricos}
 \label{chap:fundamentos-teoricos}
 
+% Cada concepto se explica en pocas oraciones, con una referencia para
+% profundizar. El lector conoce computación, no necesariamente redes neuronales.
+
+\section{Restauración de imágenes}
+\label{sec:restauracion}
+
+\subsection{Degradaciones consideradas}
+\label{sec:degradaciones}
+% Desenfoque, neblina, ruido, lluvia y baja iluminación: cómo se forman y
+% por qué cada una pide una transformación distinta.
+
+\subsection{Restauración multitarea}
+\label{sec:multitarea}
+% Un modelo para varias degradaciones: ventajas e interferencia entre tareas.
+
+\section{Redes neuronales}
+\label{sec:redes-neuronales}
+
+\subsection{Neuronas, capas y funciones de activación}
+\label{sec:capas-activaciones}
+% Capa densa, ReLU, LeakyReLU y GELU.
+
+\subsection{Entrenamiento}
+\label{sec:entrenamiento}
+% Función de pérdida (L1), descenso por gradiente y retropropagación.
+
+\subsection{Optimizadores}
+\label{sec:optimizadores}
+% Adam y AdamW, tasa de aprendizaje y su programación.
+
+\section{Redes convolucionales}
+\label{sec:convolucionales}
+
+\subsection{Convolución}
+\label{sec:convolucion}
+
+\subsection{Convoluciones \texorpdfstring{1$\times$1}{1x1} y por canal}
+\label{sec:conv-1x1-depthwise}
+% Base del módulo comprimido: proyección 1x1, convolución depthwise y cuello
+% de botella.
+
+\subsection{Normalización y conexiones residuales}
+\label{sec:normalizacion-residual}
+
+\subsection{Arquitectura codificador-decodificador}
+\label{sec:unet}
+% U-Net, niveles de resolución y conexiones skip.
+
+\subsection{Atención de canal y bloque RCAB}
+\label{sec:rcab}
+% El bloque que se comprime en el capítulo~\ref{chap:compresion}.
+
+\section{MAXIM}
+\label{sec:maxim}
+
+\subsection{Perceptrones multicapa y gMLP}
+\label{sec:gmlp}
+
+\subsection{Bloques multieje}
+\label{sec:multieje}
+% Mezcla local por bloques y global por grilla; cross-gating.
+
+\subsection{Etapas y supervisión profunda}
+\label{sec:supervision-profunda}
+
+\section{Mezcla de expertos}
+\label{sec:moe}
+
+\subsection{Ruteador y selección \textit{top-k}}
+\label{sec:ruteador}
+
+\subsection{Selección por tarea conocida}
+\label{sec:oracle}
+% La tarea de cada imagen se pasa como entrada; se ejecuta sólo su experto.
+
+\section{Compresión de redes neuronales}
+\label{sec:compresion-redes}
+
+\subsection{Destilación de conocimiento}
+\label{sec:destilacion}
+% Profesor y estudiante; imitación de la salida y de activaciones intermedias.
+
+\subsection{Costo computacional}
+\label{sec:costo}
+% Parámetros, FLOPs, latencia y memoria. Por qué menos FLOPs no implica menos
+% tiempo cuando el modelo está limitado por los accesos a memoria.
+
+\section{Evaluación}
+\label{sec:evaluacion}
+
+\subsection{PSNR y SSIM}
+\label{sec:psnr-ssim}
+
+\subsection{Promedios macro y ponderado}
+\label{sec:macro-ponderado}
+
+\subsection{Intervalos de confianza por bootstrap pareado}
+\label{sec:bootstrap}
+
+\section{Trabajos previos}
+\label{sec:trabajos-previos}
+% Comparación de enfoques, no de tablas de PSNR: los protocolos difieren.
+
+\subsection{Modelos de restauración}
+\label{sec:sota-restauracion}
+
+\subsection{Un modelo para múltiples degradaciones}
+\label{sec:sota-all-in-one}
+
+\subsection{Mezcla de expertos en restauración}
+\label{sec:sota-moe}
+
+\subsection{Derivados de MAXIM}
+\label{sec:sota-maxim}
+
 \chapter{Herramientas}
 \label{chap:herramientas}
 
-En este capítulo se describen brevemente las tecnologías empleadas para
-implementar los modelos, construir el flujo de datos, ejecutar los
-entrenamientos y analizar los resultados. La separación entre herramientas de
-cómputo numérico, definición de redes neuronales, carga de datos y entorno de
-ejecución resulta especialmente relevante en este trabajo: aunque todas
-participan del mismo experimento, cada una cumple una función distinta dentro
-del sistema.
+En este capítulo se describen brevemente las tecnologías empleadas para implementar los modelos, construir el flujo de datos, ejecutar los entrenamientos y analizar los resultados. La separación entre herramientas de cómputo numérico, definición de redes neuronales, carga de datos y entorno de ejecución resulta especialmente relevante en este trabajo: aunque todas participan del mismo experimento, cada una cumple una función distinta dentro del sistema.
 
 \section{Lenguaje y cómputo numérico}
 
 \subsection{Python}
 
-La implementación se desarrolló en Python, un lenguaje de propósito general con
-un ecosistema amplio para cómputo científico y aprendizaje automático
-\citep{pythonDocs}. Su sintaxis y su integración con entornos interactivos
-permitieron organizar en un mismo flujo la preparación de los datos, la
-definición de los modelos, el entrenamiento, la evaluación y la generación de
-diagnósticos.
+La implementación se desarrolló en Python, un lenguaje de propósito general con un ecosistema amplio para cómputo científico y aprendizaje automático \citep{pythonDocs}. Su sintaxis y su integración con entornos interactivos permitieron organizar en un mismo flujo la preparación de los datos, la definición de los modelos, el entrenamiento, la evaluación y la generación de diagnósticos.
 
-El código se distribuyó principalmente en módulos reutilizables y cuadernos de
-experimentación. Los módulos contienen la arquitectura MAXIM, las cabezas
-expertas, el ruteador y las funciones comunes, mientras que los cuadernos
-configuran cada corrida, montan los datos, ejecutan validaciones previas y
-registran métricas y checkpoints.
+El código se distribuyó principalmente en módulos reutilizables y cuadernos de experimentación. Los módulos contienen la arquitectura MAXIM, las cabezas expertas, el ruteador y las funciones comunes, mientras que los cuadernos configuran cada corrida, montan los datos, ejecutan validaciones previas y registran métricas y checkpoints.
 
 \subsection{NumPy}
 
-NumPy proporciona arreglos multidimensionales y operaciones vectorizadas para
-cómputo científico en Python \citep{harris2020numpy}. En este trabajo se utilizó
-como representación intermedia para resultados transferidos desde el pipeline
-de datos y para operaciones auxiliares de evaluación. Entre ellas se encuentran
-la acumulación de métricas, el cálculo de promedios globales y por tarea, y la
-preparación de datos para visualizaciones.
+NumPy proporciona arreglos multidimensionales y operaciones vectorizadas para cómputo científico en Python \citep{harris2020numpy}. En este trabajo se utilizó como representación intermedia para resultados transferidos desde el pipeline de datos y para operaciones auxiliares de evaluación. Entre ellas se encuentran la acumulación de métricas, el cálculo de promedios globales y por tarea, y la preparación de datos para visualizaciones.
 
 \section{Aprendizaje profundo}
 
 \subsection{JAX}
 
-JAX es una biblioteca de cómputo numérico orientada a transformaciones de
-programas sobre arreglos \citep{jax2018}. Ofrece diferenciación automática,
-vectorización y compilación justo a tiempo mediante \texttt{jax.jit}. Esta
-última permite compilar las funciones de entrenamiento y ejecutarlas sobre
-aceleradores, reduciendo el costo de las operaciones repetidas durante las
-épocas.
+JAX es una biblioteca de cómputo numérico orientada a transformaciones de programas sobre arreglos \citep{jax2018}. Ofrece diferenciación automática, vectorización y compilación justo a tiempo mediante \texttt{jax.jit}. Esta última permite compilar las funciones de entrenamiento y ejecutarlas sobre aceleradores, reduciendo el costo de las operaciones repetidas durante las épocas.
 
-La implementación de MAXIM utilizada como base fue desarrollada en este
-ecosistema. JAX se empleó para las operaciones tensoriales del modelo, el
-cálculo de gradientes, la actualización durante el entrenamiento y la
-evaluación de las reconstrucciones. También permitió aplicar recomputación de
-activaciones en las partes de mayor consumo de memoria cuando fue necesario.
+La implementación de MAXIM utilizada como base fue desarrollada en este ecosistema. JAX se empleó para las operaciones tensoriales del modelo, el cálculo de gradientes, la actualización durante el entrenamiento y la evaluación de las reconstrucciones. También permitió aplicar recomputación de activaciones en las partes de mayor consumo de memoria cuando fue necesario.
 
 \subsection{Flax}
 
-Flax es una biblioteca de redes neuronales construida sobre JAX
-\citep{flax2023}. La implementación utiliza su API \textit{Linen}, en la que las
-capas y los modelos se expresan como subclases de \texttt{nn.Module}. Este
-esquema se empleó tanto para los bloques originales de MAXIM como para las
-extensiones de esta tesis: la cabeza compartida, los expertos residuales y el
-ruteador.
+Flax es una biblioteca de redes neuronales construida sobre JAX \citep{flax2023}. La implementación utiliza su API \textit{Linen}, en la que las capas y los modelos se expresan como subclases de \texttt{nn.Module}. Este esquema se empleó tanto para los bloques originales de MAXIM como para las extensiones de esta tesis: la cabeza compartida, los expertos residuales y el ruteador.
 
-Flax también organiza los parámetros y el estado del modelo en estructuras
-compatibles con las transformaciones de JAX. Esto permitió conservar el camino
-de reconstrucción de MAXIM, incorporar módulos especializados y restaurar
-checkpoints sin acoplar la definición de la arquitectura a un cuaderno
-particular.
+Flax también organiza los parámetros y el estado del modelo en estructuras compatibles con las transformaciones de JAX. Esto permitió conservar el camino de reconstrucción de MAXIM, incorporar módulos especializados y restaurar checkpoints sin acoplar la definición de la arquitectura a un cuaderno particular.
 
 \section{Carga y procesamiento de datos}
 
 \subsection{TensorFlow Data}
 
-Aunque los modelos se implementaron con JAX y Flax, el flujo de entrada se
-construyó con la API \texttt{tf.data} de TensorFlow \citep{tensorflow2016}.
-Esta API permite representar colecciones potencialmente grandes como secuencias
-de transformaciones, aplicar operaciones en paralelo, agrupar ejemplos en
-batches y anticipar su carga mediante \textit{prefetch}.
+Aunque los modelos se implementaron con JAX y Flax, el flujo de entrada se construyó con la API \texttt{tf.data} de TensorFlow \citep{tensorflow2016}. Esta API permite representar colecciones potencialmente grandes como secuencias de transformaciones, aplicar operaciones en paralelo, agrupar ejemplos en batches y anticipar su carga mediante \textit{prefetch}.
 
-Para cada tarea de restauración se construyó un conjunto de pares formado por
-una imagen degradada y su referencia. Durante el entrenamiento, cada fuente se
-repite antes de combinarse con \texttt{sample\_from\_datasets}; de este modo,
-las cinco tareas permanecen disponibles durante toda la época y pueden
-muestrearse uniformemente. El mismo pipeline aplica recortes y aumentos
-alineados a ambos elementos del par. La validación, en cambio, concatena los
-conjuntos sin muestreo y recorre de manera determinista todos los ejemplos.
+Para cada tarea de restauración se construyó un conjunto de pares formado por una imagen degradada y su referencia. Durante el entrenamiento, cada fuente se repite antes de combinarse con \texttt{sample\_from\_datasets}; de este modo, las cinco tareas permanecen disponibles durante toda la época y pueden muestrearse uniformemente. El mismo pipeline aplica recortes y aumentos alineados a ambos elementos del par. La validación, en cambio, concatena los conjuntos sin muestreo y recorre de manera determinista todos los ejemplos.
 
 \subsection{Pillow}
 
-Pillow es una biblioteca de procesamiento de imágenes para Python con soporte
-para numerosos formatos de archivo \citep{pillowDocs}. Se utilizó para abrir y
-decodificar las imágenes de los conjuntos de datos, convertirlas a tres canales
-de color y realizar comprobaciones de integridad. También formó parte de las
-pruebas que verifican que cada ruta listada pueda convertirse en un arreglo con
-las dimensiones y el rango esperados antes de iniciar un entrenamiento largo.
+Pillow es una biblioteca de procesamiento de imágenes para Python con soporte para numerosos formatos de archivo \citep{pillowDocs}. Se utilizó para abrir y decodificar las imágenes de los conjuntos de datos, convertirlas a tres canales de color y realizar comprobaciones de integridad. También formó parte de las pruebas que verifican que cada ruta listada pueda convertirse en un arreglo con las dimensiones y el rango esperados antes de iniciar un entrenamiento largo.
 
 \section{Ejecución y almacenamiento}
 
 \subsection{Google Colaboratory}
 
-Google Colaboratory es un servicio alojado de cuadernos Jupyter que proporciona
-acceso a recursos de cómputo, incluidas GPU y TPU, sin requerir una instalación
-local completa \citep{googleColab}. Los entrenamientos y las evaluaciones de
-esta tesis se ejecutaron en sesiones de Colab con GPU. Los cuadernos permitieron
-reunir la configuración de cada experimento, las comprobaciones previas, la
-ejecución y una primera inspección de los resultados.
+Google Colaboratory es un servicio alojado de cuadernos Jupyter que proporciona acceso a recursos de cómputo, incluidas GPU y TPU, sin requerir una instalación local completa \citep{googleColab}. Los entrenamientos y las evaluaciones de esta tesis se ejecutaron en sesiones de Colab con GPU. Los cuadernos permitieron reunir la configuración de cada experimento, las comprobaciones previas, la ejecución y una primera inspección de los resultados.
 
-Los recursos asignados por Colab pueden variar entre sesiones y el entorno de
-ejecución es temporal. Por este motivo, las versiones de JAX y Flax se fijaron
-explícitamente y cada corrida se guardó en un directorio independiente. También
-se conservaron el archivo de configuración, el historial de entrenamiento, los
-diagnósticos del ruteador y los checkpoints necesarios para reanudar o evaluar
-un modelo.
+Los recursos asignados por Colab pueden variar entre sesiones y el entorno de ejecución es temporal. Por este motivo, las versiones de JAX y Flax se fijaron explícitamente y cada corrida se guardó en un directorio independiente. También se conservaron el archivo de configuración, el historial de entrenamiento, los diagnósticos del ruteador y los checkpoints necesarios para reanudar o evaluar un modelo.
 
 \subsection{Google Drive}
 
-Google Drive se utilizó como almacenamiento persistente vinculado a los
-cuadernos de Colab. Allí se mantuvieron los conjuntos de datos, las listas de
-entrenamiento y validación, los checkpoints y los resultados de cada
-experimento. Para reducir el riesgo de utilizar una versión incompleta de los
-datos, las listas principales se identificaron mediante conteos y resúmenes
-SHA-256, y los cuadernos ejecutaron pruebas de lectura sobre batches reales
-antes de habilitar el entrenamiento.
+Google Drive se utilizó como almacenamiento persistente vinculado a los cuadernos de Colab. Allí se mantuvieron los conjuntos de datos, las listas de entrenamiento y validación, los checkpoints y los resultados de cada experimento. Para reducir el riesgo de utilizar una versión incompleta de los datos, las listas principales se identificaron mediante conteos y resúmenes SHA-256, y los cuadernos ejecutaron pruebas de lectura sobre batches reales antes de habilitar el entrenamiento.
 
 \section{Visualización de resultados}
 
 \subsection{Matplotlib}
 
-Matplotlib es una biblioteca de visualización para Python
-\citep{hunter2007matplotlib}. Se empleó para representar la evolución de las
-pérdidas y de la PSNR, comparar el desempeño por tarea y construir mapas de
-calor del uso de los expertos. Estas visualizaciones complementan las métricas
-agregadas: permiten detectar diferencias entre tareas y observar si el ruteador
-concentra sus decisiones, distribuye la carga o utiliza de manera efectiva los
-expertos disponibles.
+Matplotlib es una biblioteca de visualización para Python \citep{hunter2007matplotlib}. Se empleó para representar la evolución de las pérdidas y de la PSNR, comparar el desempeño por tarea y construir mapas de calor del uso de los expertos. Estas visualizaciones complementan las métricas agregadas: permiten detectar diferencias entre tareas y observar si el ruteador concentra sus decisiones, distribuye la carga o utiliza de manera efectiva los expertos disponibles.
+
+\chapter{Conjunto de datos}
+\label{chap:datos}
+
+\section{Fuentes por tarea}
+\label{sec:fuentes}
+% GoPro y RealBlur; RESIDE (SOTS, HSTS); SIDD; lluvia; LOL y MIT-Adobe FiveK.
+
+\section{Auditoría y depuración de pares}
+\label{sec:auditoria}
+
+\section{División en entrenamiento, validación y test}
+\label{sec:split}
+% Split agrupado por escena o fuente: 20.523 / 2.303 / 4.730 pares.
+
+\section{Muestreo y preprocesamiento}
+\label{sec:muestreo}
+% Muestreo uniforme por tarea, recortes de 256x256, aumentaciones.
+
+\section{Protocolo de evaluación}
+\label{sec:protocolo}
+% Recorte central, selección de época por validación, uso único del test.
+
+\chapter{Expertos por tarea en MAXIM}
+\label{chap:expertos}
+
+\section{Primera aproximación: expertos con ruteador}
+\label{sec:moe-ruteador}
+
+\subsection{Configuración del experimento}
+\label{sec:moe-ruteador-config}
+
+\subsection{Resultados}
+\label{sec:moe-ruteador-resultados}
+% Converge, pero no supera al baseline y el ruteador reparte el peso por igual.
+
+\section{Expertos por tarea con cabeza compartida}
+\label{sec:shared}
+
+\subsection{Variantes evaluadas}
+\label{sec:shared-variantes}
+
+\subsection{Configuración del experimento}
+\label{sec:shared-config}
+
+\subsection{Resultados}
+\label{sec:shared-resultados}
+% Test del 4/10: shared y baseline dan la misma calidad.
+
+\section{Discusión}
+\label{sec:expertos-discusion}
+% Por qué los expertos no mejoran la calidad y por qué eso orienta el trabajo
+% hacia el costo.
+
+\chapter{Compresión de MAXIM con expertos}
+\label{chap:compresion}
+
+\section{Diagnóstico de costo}
+\label{sec:diagnostico}
+% Dónde están los parámetros y el tiempo; elección de los RCAB del nivel 2.
+
+\section{Reemplazo de los bloques RCAB}
+\label{sec:reemplazo}
+
+\subsection{Módulo con cuello de botella}
+\label{sec:modulo}
+
+\subsection{Módulo común y banco de expertos}
+\label{sec:s1-s2}
+
+\section{Adaptación por destilación}
+\label{sec:adaptacion}
+
+\subsection{Configuración del experimento}
+\label{sec:adaptacion-config}
+
+\subsection{Criterio de aceptación}
+\label{sec:criterio}
+% Fijado antes de correr: -0,05 dB de macro y ninguna tarea por debajo de -0,10.
+
+\section{Resultados}
+\label{sec:compresion-resultados}
+
+\subsection{Calidad en validación y test}
+\label{sec:calidad}
+
+\subsection{Costo de inferencia}
+\label{sec:costo-inferencia}
+% Parámetros, FLOPs, latencia y memoria.
+
+\subsection{Costo de entrenamiento}
+\label{sec:costo-entrenamiento}
+% Paso completo frente a adaptación; horas de GPU.
+
+\section{Expertos en más niveles}
+\label{sec:niveles}
+
+\subsection{Configuración del experimento}
+\label{sec:niveles-config}
+
+\subsection{Resultados}
+\label{sec:niveles-resultados}
+
+\section{Calidad frente a compresión}
+\label{sec:calidad-compresion}
+% Figuras fig_calidad_vs_flops y fig_calidad_por_tarea, con datos de test.
+
+\chapter{Conclusiones y trabajo futuro}
+\label{chap:conclusiones}
+
+\section{Conclusiones}
+\label{sec:conclusiones}
+
+\section{Trabajo futuro}
+\label{sec:trabajo-futuro}
+% Convolución por canal de 5x5, clasificador de tarea, compresión de gMLP y
+% cross-gating.
 
 \appendix
 \printbibliography
